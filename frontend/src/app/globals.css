@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --votuna-ink: 15 23 42;
+  --votuna-paper: 250 248 244;
+  --votuna-sand: 244 236 224;
+  --votuna-accent: 234 88 12;
+  --votuna-accent-soft: 255 237 213;
+  --votuna-shadow: 15 23 42;
+}
+
+body {
+  color: rgb(var(--votuna-ink));
+  background: radial-gradient(circle at top, rgba(250, 248, 244, 1), rgba(244, 236, 224, 1));
+  min-height: 100vh;
+}
+
+.fade-up {
+  animation: fade-up 0.6s ease both;
+}
+
+.fade-up-delay {
+  animation: fade-up 0.6s ease 0.12s both;
+}
+
+.fade-up-delay-lg {
+  animation: fade-up 0.6s ease 0.24s both;
+}
+
+.no-marker::-webkit-details-marker {
+  display: none;
+}
+
+.no-marker::marker {
+  content: "";
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .fade-up-delay,
+  .fade-up-delay-lg {
+    animation: none;
+  }
+}

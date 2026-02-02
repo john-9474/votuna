@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: votuna_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-votuna_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-votuna_password}
+      POSTGRES_DB: ${DB_NAME:-votuna}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - votuna_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-votuna_user} -d ${DB_NAME:-votuna}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: votuna_api
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-votuna_user}:${DB_PASSWORD:-votuna_password}@postgres:5432/${DB_NAME:-votuna}
+      DEBUG: ${DEBUG:-False}
+      PROJECT_NAME: ${PROJECT_NAME:-Votuna API}
+      SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-False}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:8000/api/v1/auth/callback/spotify}
+      SOUNDCLOUD_CLIENT_ID: ${SOUNDCLOUD_CLIENT_ID:-}
+      SOUNDCLOUD_CLIENT_SECRET: ${SOUNDCLOUD_CLIENT_SECRET:-}
+      SOUNDCLOUD_REDIRECT_URI: ${SOUNDCLOUD_REDIRECT_URI:-http://localhost:8000/api/v1/auth/callback/soundcloud}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-change-me}
+      AUTH_TOKEN_EXPIRE_MINUTES: ${AUTH_TOKEN_EXPIRE_MINUTES:-10080}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-votuna_access_token}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+    networks:
+      - votuna_network
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  api_tests:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: votuna_api_tests
+    profiles:
+      - test
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-votuna_user}:${DB_PASSWORD:-votuna_password}@postgres:5432/${DB_NAME:-votuna}
+      DEBUG: ${DEBUG:-False}
+      PROJECT_NAME: ${PROJECT_NAME:-Votuna API}
+      SQLALCHEMY_ECHO: ${SQLALCHEMY_ECHO:-False}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID:-}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET:-}
+      SPOTIFY_REDIRECT_URI: ${SPOTIFY_REDIRECT_URI:-http://localhost:8000/api/v1/auth/callback/spotify}
+      SOUNDCLOUD_CLIENT_ID: ${SOUNDCLOUD_CLIENT_ID:-}
+      SOUNDCLOUD_CLIENT_SECRET: ${SOUNDCLOUD_CLIENT_SECRET:-}
+      SOUNDCLOUD_REDIRECT_URI: ${SOUNDCLOUD_REDIRECT_URI:-http://localhost:8000/api/v1/auth/callback/soundcloud}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-change-me}
+      AUTH_TOKEN_EXPIRE_MINUTES: ${AUTH_TOKEN_EXPIRE_MINUTES:-10080}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-votuna_access_token}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
+      AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-lax}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+    networks:
+      - votuna_network
+    command: pytest -q
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: votuna_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "500"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    networks:
+      - votuna_network
+    command: bun run dev
+
+volumes:
+  postgres_data:
+
+networks:
+  votuna_network:
+    driver: bridge

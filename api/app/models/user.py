@@ -1,0 +1,33 @@
+"""User model"""
+from sqlalchemy import Column, String, Boolean, DateTime, UniqueConstraint
+from sqlalchemy.orm import relationship
+
+from app.models.base import BaseModel
+
+
+class User(BaseModel):
+    """Application user authenticated via SSO providers"""
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("auth_provider", "provider_user_id", name="uq_users_provider_user_id"),)
+
+    auth_provider = Column(String, index=True, nullable=False)
+    provider_user_id = Column(String, index=True, nullable=False)
+    email = Column(String, index=True, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)
+    avatar_url = Column(String, nullable=True)
+
+    access_token = Column(String, nullable=True)
+    refresh_token = Column(String, nullable=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    settings = relationship(
+        "UserSettings",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
