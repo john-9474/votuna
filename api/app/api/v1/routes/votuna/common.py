@@ -1,0 +1,63 @@
+"""Shared helpers for Votuna routes."""
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.models.user import User
+from app.models.votuna_playlist import VotunaPlaylist
+from app.crud.user import user_crud
+from app.crud.votuna_playlist import votuna_playlist_crud
+from app.crud.votuna_playlist_member import votuna_playlist_member_crud
+from app.services.music_providers import get_music_provider
+
+
+def get_playlist_or_404(db: Session, playlist_id: int) -> VotunaPlaylist:
+    playlist = votuna_playlist_crud.get(db, playlist_id)
+    if not playlist:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist not found")
+    return playlist
+
+
+def require_member(db: Session, playlist_id: int, user_id: int):
+    member = votuna_playlist_member_crud.get_member(db, playlist_id, user_id)
+    if not member:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not a playlist member")
+    return member
+
+
+def require_owner(db: Session, playlist_id: int, user_id: int) -> VotunaPlaylist:
+    playlist = get_playlist_or_404(db, playlist_id)
+    if playlist.owner_user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not playlist owner")
+    return playlist
+
+
+def get_provider_client(provider: str, user: User):
+    if not user.access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing provider access token",
+        )
+    try:
+        return get_music_provider(provider, user.access_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+def get_owner_client(db: Session, playlist: VotunaPlaylist):
+    owner = user_crud.get(db, playlist.owner_user_id)
+    if not owner:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Playlist owner not found")
+    return get_provider_client(playlist.provider, owner)
+
+
+def raise_provider_auth(current_user: User, owner_id: int | None = None) -> None:
+    """Raise an auth error, logging out owner or warning members."""
+    if owner_id is None or current_user.id == owner_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="SoundCloud authorization expired or invalid",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Playlist owner must reconnect SoundCloud",
+    )

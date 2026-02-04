@@ -3,7 +3,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD
-from app.models.votuna import VotunaPlaylistSettings
+from app.models.votuna_playlist_settings import VotunaPlaylistSettings
 
 
 class VotunaPlaylistSettingsCRUD(BaseCRUD[VotunaPlaylistSettings, dict, dict]):

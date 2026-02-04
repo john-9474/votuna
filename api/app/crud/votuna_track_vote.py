@@ -2,7 +2,7 @@
 from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD
-from app.models.votuna import VotunaTrackVote
+from app.models.votuna_votes import VotunaTrackVote
 
 
 class VotunaTrackVoteCRUD(BaseCRUD[VotunaTrackVote, dict, dict]):

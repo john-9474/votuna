@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.crud.base import BaseCRUD
-from app.models.votuna import VotunaPlaylist
+from app.models.votuna_playlist import VotunaPlaylist
 
 
 class VotunaPlaylistCRUD(BaseCRUD[VotunaPlaylist, dict, dict]):
@@ -26,7 +26,7 @@ class VotunaPlaylistCRUD(BaseCRUD[VotunaPlaylist, dict, dict]):
 
     def list_for_user(self, db: Session, user_id: int) -> Sequence[VotunaPlaylist]:
         """Return playlists owned by or shared with the user."""
-        from app.models.votuna import VotunaPlaylistMember
+        from app.models.votuna_members import VotunaPlaylistMember
 
         return (
             db.query(VotunaPlaylist)

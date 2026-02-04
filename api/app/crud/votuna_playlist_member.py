@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD
 from app.models.user import User
-from app.models.votuna import VotunaPlaylistMember
+from app.models.votuna_members import VotunaPlaylistMember
 
 
 class VotunaPlaylistMemberCRUD(BaseCRUD[VotunaPlaylistMember, dict, dict]):

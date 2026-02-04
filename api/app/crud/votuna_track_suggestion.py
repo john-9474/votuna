@@ -3,7 +3,7 @@ from typing import Optional, Sequence
 from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD
-from app.models.votuna import VotunaTrackSuggestion
+from app.models.votuna_suggestions import VotunaTrackSuggestion
 
 
 class VotunaTrackSuggestionCRUD(BaseCRUD[VotunaTrackSuggestion, dict, dict]):
