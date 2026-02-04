@@ -56,7 +56,10 @@ def join_with_invite(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found")
     if invite.is_revoked:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite revoked")
-    if invite.expires_at and invite.expires_at < datetime.now(timezone.utc):
+    expires_at = invite.expires_at
+    if expires_at and expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    if expires_at and expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite expired")
     if invite.max_uses is not None and invite.uses_count >= invite.max_uses:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite fully used")
