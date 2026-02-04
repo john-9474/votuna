@@ -1,6 +1,8 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { apiJsonOrNull } from '../lib/api'
 
 type ThemeSetting = 'light' | 'dark' | 'system'
 
@@ -9,7 +11,6 @@ type UserSettings = {
   receive_emails: boolean
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const THEME_STORAGE_KEY = 'votuna-theme'
 
 function resolveTheme(theme: ThemeSetting) {
@@ -33,24 +34,21 @@ export default function ThemeManager() {
     const storedTheme = (localStorage.getItem(THEME_STORAGE_KEY) as ThemeSetting | null) ?? 'system'
     setTheme(storedTheme)
     applyTheme(storedTheme)
-
-    const loadSettings = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/v1/users/me/settings`, {
-          credentials: 'include',
-        })
-        if (!response.ok) return
-        const payload = (await response.json()) as UserSettings
-        setTheme(payload.theme)
-        applyTheme(payload.theme)
-        localStorage.setItem(THEME_STORAGE_KEY, payload.theme)
-      } catch {
-        // Ignore settings load failures and keep system default.
-      }
-    }
-
-    loadSettings()
   }, [])
+
+  const settingsQuery = useQuery({
+    queryKey: ['userSettings'],
+    queryFn: () => apiJsonOrNull<UserSettings>('/api/v1/users/me/settings'),
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (!settingsQuery.data?.theme) return
+    setTheme(settingsQuery.data.theme)
+    applyTheme(settingsQuery.data.theme)
+    localStorage.setItem(THEME_STORAGE_KEY, settingsQuery.data.theme)
+  }, [settingsQuery.data?.theme])
 
   useEffect(() => {
     const handler = (event: Event) => {

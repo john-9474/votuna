@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy import text
@@ -37,6 +37,20 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def clear_auth_cookie_on_unauthorized(request, call_next):
+    """Clear auth cookie on 401s to force re-login when tokens expire."""
+    response = await call_next(request)
+    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+        response.delete_cookie(
+            settings.AUTH_COOKIE_NAME,
+            httponly=True,
+            secure=settings.AUTH_COOKIE_SECURE,
+            samesite=settings.AUTH_COOKIE_SAMESITE,
+        )
+    return response
 
 # Add CORS middleware
 app.add_middleware(

@@ -2,8 +2,11 @@
 
 import { Menu } from '@headlessui/react'
 import { Button, Dialog, DialogPanel } from '@tremor/react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { apiFetch, apiJsonOrNull, API_URL } from '../lib/api'
 
 type User = {
   id?: number
@@ -14,8 +17,6 @@ type User = {
   avatar_url?: string | null
   auth_provider?: string | null
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 
 /** Select the best display name for the current user. */
 function getDisplayName(user: User | null) {
@@ -40,9 +41,17 @@ function getInitials(user: User | null) {
 
 /** Site navigation with auth controls and login modal. */
 export default function Navbar() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
   const [loginOpen, setLoginOpen] = useState(false)
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(false)
+  const userQuery = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => apiJsonOrNull<User>('/api/v1/users/me'),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+  const user = userQuery.data ?? null
+  const loading = userQuery.isLoading || userQuery.isFetching
 
   const displayName = useMemo(() => getDisplayName(user), [user])
   const avatarSrc = useMemo(() => {
@@ -51,31 +60,11 @@ export default function Navbar() {
     return `${API_URL}/api/v1/users/me/avatar?v=${version}`
   }, [user])
 
-  /** Fetch the current user based on the session cookie. */
-  const loadUser = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = await fetch(`${API_URL}/api/v1/users/me`, {
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        setUser(null)
-        return
-      }
-      const payload = (await response.json()) as User
-      setUser(payload)
-    } catch {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    loadUser()
-    window.addEventListener('focus', loadUser)
-    return () => window.removeEventListener('focus', loadUser)
-  }, [loadUser])
+    if (user) {
+      setLoginOpen(false)
+    }
+  }, [user])
 
   /** Start the SoundCloud OAuth flow. */
   const handleSoundcloudLogin = () => {
@@ -85,27 +74,34 @@ export default function Navbar() {
   /** Clear the auth cookie and local session state. */
   const handleLogout = async () => {
     try {
-      await fetch(`${API_URL}/api/v1/auth/logout`, {
+      await apiFetch('/api/v1/auth/logout', {
         method: 'POST',
-        credentials: 'include',
+        authRequired: false,
       })
     } finally {
-      setUser(null)
+      queryClient.clear()
+      router.push('/')
     }
   }
 
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<User | null>).detail
-      if (detail) {
-        setUser(detail)
-      } else {
-        loadUser()
-      }
+      queryClient.setQueryData(['currentUser'], detail ?? null)
     }
     window.addEventListener('votuna:user-updated', handler as EventListener)
     return () => window.removeEventListener('votuna:user-updated', handler as EventListener)
-  }, [loadUser])
+  }, [queryClient])
+
+  useEffect(() => {
+    const handler = () => {
+      setLoginOpen(true)
+      queryClient.clear()
+      router.replace('/')
+    }
+    window.addEventListener('votuna:auth-expired', handler as EventListener)
+    return () => window.removeEventListener('votuna:auth-expired', handler as EventListener)
+  }, [queryClient, router])
 
   return (
     <nav className="sticky top-0 z-40 border-b border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] backdrop-blur">
@@ -135,7 +131,7 @@ export default function Navbar() {
                   <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[rgb(var(--votuna-paper))] bg-emerald-500" />
                 </span>
                 <span className="max-w-[160px] truncate">{displayName}</span>
-                <span className="text-xs text-[color:rgb(var(--votuna-ink)/0.4)]">▾</span>
+                <span className="text-xs text-[color:rgb(var(--votuna-ink)/0.4)]">v</span>
               </Menu.Button>
               <Menu.Items className="absolute right-0 z-50 mt-2 w-52 isolate rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgb(var(--votuna-paper))] p-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)] opacity-100 shadow-xl shadow-black/10 backdrop-blur-0">
                 <Menu.Item>
@@ -176,7 +172,7 @@ export default function Navbar() {
       </div>
 
       <Dialog open={loginOpen} onClose={setLoginOpen}>
-        <DialogPanel className="w-full max-w-md rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.95)] p-6 shadow-2xl shadow-black/10">
+        <DialogPanel className="w-full max-w-md rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgb(var(--votuna-paper))] p-6 shadow-2xl shadow-black/10">
           <div className="flex items-start justify-between gap-6">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">

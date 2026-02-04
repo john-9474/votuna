@@ -1,8 +1,10 @@
 'use client'
 
 import { Button, Card, Select, SelectItem, TextInput } from '@tremor/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { apiJson, apiJsonOrNull, API_URL } from '../../lib/api'
 
 type User = {
   id?: number
@@ -21,13 +23,11 @@ type UserSettings = {
   receive_emails: boolean
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
 const THEME_STORAGE_KEY = 'votuna-theme'
 
 /** Profile page for the authenticated user. */
 export default function ProfilePage() {
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [form, setForm] = useState({
     email: '',
@@ -39,14 +39,28 @@ export default function ProfilePage() {
   const [status, setStatus] = useState<Record<string, string>>({})
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarStatus, setAvatarStatus] = useState('')
-  const [settings, setSettings] = useState<UserSettings | null>(null)
   const [settingsForm, setSettingsForm] = useState<UserSettings>({
     theme: 'system',
     receive_emails: true,
   })
-  const [settingsLoading, setSettingsLoading] = useState(true)
-  const [settingsSaving, setSettingsSaving] = useState(false)
   const [settingsStatus, setSettingsStatus] = useState('')
+
+  const userQuery = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => apiJsonOrNull<User>('/api/v1/users/me'),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+  const user = userQuery.data ?? null
+
+  const settingsQuery = useQuery({
+    queryKey: ['userSettings'],
+    queryFn: () => apiJson<UserSettings>('/api/v1/users/me/settings', { authRequired: true }),
+    enabled: !!user?.id,
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+  })
+  const settings = settingsQuery.data ?? null
 
   const avatarSrc = user?.avatar_url
     ? `${API_URL}/api/v1/users/me/avatar?v=${encodeURIComponent(user.avatar_url)}`
@@ -72,81 +86,70 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    /** Fetch the current user session for profile editing. */
-    const loadUser = async () => {
-      setLoading(true)
-      try {
-        const response = await fetch(`${API_URL}/api/v1/users/me`, {
-          credentials: 'include',
-        })
-        if (!response.ok) {
-          setUser(null)
-          return
-        }
-        const payload = (await response.json()) as User
-        setUser(payload)
-        syncForm(payload)
-      } catch {
-        setUser(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadUser()
-  }, [])
+    syncForm(user)
+  }, [user])
 
   useEffect(() => {
-    if (!user) {
-      setSettings(null)
-      setSettingsLoading(false)
-      return
-    }
+    if (!settings) return
+    syncSettingsForm(settings)
+    localStorage.setItem(THEME_STORAGE_KEY, settings.theme)
+  }, [settings])
 
-    const loadSettings = async () => {
-      setSettingsLoading(true)
-      try {
-        const response = await fetch(`${API_URL}/api/v1/users/me/settings`, {
-          credentials: 'include',
-        })
-        if (!response.ok) {
-          return
-        }
-        const payload = (await response.json()) as UserSettings
-        setSettings(payload)
-        syncSettingsForm(payload)
-        localStorage.setItem(THEME_STORAGE_KEY, payload.theme)
-      } catch {
-        setSettings(null)
-      } finally {
-        setSettingsLoading(false)
-      }
-    }
+  const saveFieldMutation = useMutation({
+    mutationFn: async ({ field, value }: { field: keyof typeof form; value: string }) => {
+      const payload = { [field]: value.trim() === '' ? null : value.trim() }
+      return apiJson<User>('/api/v1/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        authRequired: true,
+        body: JSON.stringify(payload),
+      })
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['currentUser'], updated)
+      window.dispatchEvent(new CustomEvent('votuna:user-updated', { detail: updated }))
+    },
+  })
 
-    loadSettings()
-  }, [user?.id])
+  const avatarMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return apiJson<User>('/api/v1/users/me/avatar', {
+        method: 'POST',
+        authRequired: true,
+        body: formData,
+      })
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['currentUser'], updated)
+      window.dispatchEvent(new CustomEvent('votuna:user-updated', { detail: updated }))
+    },
+  })
+
+  const settingsMutation = useMutation({
+    mutationFn: async (payload: UserSettings) => {
+      return apiJson<UserSettings>('/api/v1/users/me/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        authRequired: true,
+        body: JSON.stringify(payload),
+      })
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['userSettings'], updated)
+      localStorage.setItem(THEME_STORAGE_KEY, updated.theme)
+      window.dispatchEvent(new CustomEvent('votuna:settings-updated', { detail: updated }))
+    },
+  })
 
   /** Update a single profile field. */
   const saveField = async (field: keyof typeof form) => {
     setSaving((prev) => ({ ...prev, [field]: true }))
     setStatus((prev) => ({ ...prev, [field]: '' }))
-    const rawValue = form[field].trim()
-    const payload = { [field]: rawValue === '' ? null : rawValue }
     try {
-      const response = await fetch(`${API_URL}/api/v1/users/me`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(body.detail ?? 'Unable to save')
-      }
-      const updated = (await response.json()) as User
-      setUser(updated)
+      const updated = await saveFieldMutation.mutateAsync({ field, value: form[field] })
       syncForm(updated)
-      window.dispatchEvent(new CustomEvent('votuna:user-updated', { detail: updated }))
       setStatus((prev) => ({ ...prev, [field]: 'Saved' }))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save'
@@ -167,21 +170,8 @@ export default function ProfilePage() {
     setAvatarUploading(true)
     setAvatarStatus('')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const response = await fetch(`${API_URL}/api/v1/users/me/avatar`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(body.detail ?? 'Unable to upload avatar')
-      }
-      const updated = (await response.json()) as User
-      setUser(updated)
+      const updated = await avatarMutation.mutateAsync(file)
       syncForm(updated)
-      window.dispatchEvent(new CustomEvent('votuna:user-updated', { detail: updated }))
       setAvatarStatus('Avatar updated')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to upload avatar'
@@ -206,30 +196,13 @@ export default function ProfilePage() {
 
   const saveSettings = async () => {
     if (!settings) return
-    setSettingsSaving(true)
     setSettingsStatus('')
     try {
-      const response = await fetch(`${API_URL}/api/v1/users/me/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(settingsForm),
-      })
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(body.detail ?? 'Unable to save settings')
-      }
-      const updated = (await response.json()) as UserSettings
-      setSettings(updated)
-      syncSettingsForm(updated)
-      localStorage.setItem(THEME_STORAGE_KEY, updated.theme)
-      window.dispatchEvent(new CustomEvent('votuna:settings-updated', { detail: updated }))
+      await settingsMutation.mutateAsync(settingsForm)
       setSettingsStatus('Settings saved')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to save settings'
       setSettingsStatus(message)
-    } finally {
-      setSettingsSaving(false)
     }
   }
 
@@ -243,7 +216,7 @@ export default function ProfilePage() {
     (settingsForm.theme !== settings.theme ||
       settingsForm.receive_emails !== settings.receive_emails)
 
-  if (loading) {
+  if (userQuery.isLoading) {
     return (
       <main className="mx-auto w-full max-w-4xl px-6 py-16">
         <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
@@ -452,10 +425,10 @@ export default function ProfilePage() {
             </div>
             <Button
               onClick={saveSettings}
-              disabled={!settingsDirty || settingsSaving || settingsLoading}
+              disabled={!settingsDirty || settingsMutation.isPending || settingsQuery.isLoading}
               className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
             >
-              {settingsSaving ? 'Saving...' : 'Save settings'}
+              {settingsMutation.isPending ? 'Saving...' : 'Save settings'}
             </Button>
           </div>
 
@@ -497,7 +470,7 @@ export default function ProfilePage() {
           {settingsStatus ? (
             <p className="mt-4 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">{settingsStatus}</p>
           ) : null}
-          {settingsLoading ? (
+          {settingsQuery.isLoading ? (
             <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">Loading settings...</p>
           ) : null}
         </Card>

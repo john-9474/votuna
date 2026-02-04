@@ -1,6 +1,6 @@
 """User routes"""
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -66,8 +66,26 @@ def get_my_avatar(current_user: User = Depends(get_current_user)):
     if not current_user.avatar_url:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
     if str(current_user.avatar_url).startswith("http"):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
+        return RedirectResponse(url=current_user.avatar_url)
     path = get_avatar_file_path(current_user.avatar_url)
+    if not path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
+    return FileResponse(path)
+
+
+@router.get("/{user_id}/avatar")
+def get_user_avatar(
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the stored avatar image for a user."""
+    user = user_crud.get(db, user_id)
+    if not user or not user.avatar_url:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
+    if str(user.avatar_url).startswith("http"):
+        return RedirectResponse(url=user.avatar_url)
+    path = get_avatar_file_path(user.avatar_url)
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar not found")
     return FileResponse(path)

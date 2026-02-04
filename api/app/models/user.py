@@ -31,3 +31,18 @@ class User(BaseModel):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    votuna_playlists = relationship(
+        "VotunaPlaylist",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+    )
+    votuna_memberships = relationship(
+        "VotunaPlaylistMember",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    votuna_votes = relationship(
+        "VotunaTrackVote",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

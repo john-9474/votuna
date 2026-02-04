@@ -8,6 +8,6 @@ alembic==1.13.0
 psycopg2-binary==2.9.9
 pytest==7.4.3
 httpx==0.25.1
-fastapi-sso @ git+https://github.com/john-9474/fastapi-sso@soundcloud
+fastapi-sso==0.20.0
 PyJWT==2.10.1
 python-multipart==0.0.9

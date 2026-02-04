@@ -9,6 +9,14 @@ from dotenv import load_dotenv
 from app.db.session import Base
 from app.models.user import User
 from app.models.user_settings import UserSettings
+from app.models.votuna import (
+    VotunaPlaylist,
+    VotunaPlaylistSettings,
+    VotunaPlaylistMember,
+    VotunaPlaylistInvite,
+    VotunaTrackSuggestion,
+    VotunaTrackVote,
+)
 
 # Load environment variables
 load_dotenv()

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SOUNDCLOUD_CLIENT_ID: str = ""
     SOUNDCLOUD_CLIENT_SECRET: str = ""
     SOUNDCLOUD_REDIRECT_URI: str = ""
+    SOUNDCLOUD_API_BASE_URL: str = "https://api.soundcloud.com"
     AUTH_SECRET_KEY: str = ""
     AUTH_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7
     AUTH_COOKIE_NAME: str = "votuna_access_token"
