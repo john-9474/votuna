@@ -49,7 +49,7 @@ def test_login_redirect(client, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 
     monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
-    response = client.get("/api/v1/auth/login/soundcloud", allow_redirects=False)
+    response = client.get("/api/v1/auth/login/soundcloud", follow_redirects=False)
     assert response.status_code in {302, 307}
     assert response.headers["location"] == "https://example.com/login"
 
@@ -58,7 +58,7 @@ def test_callback_creates_user_and_sets_cookie(client, db_session, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 
     monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
-    response = client.get("/api/v1/auth/callback/soundcloud", allow_redirects=False)
+    response = client.get("/api/v1/auth/callback/soundcloud", follow_redirects=False)
     assert response.status_code in {302, 307}
     assert settings.AUTH_COOKIE_NAME in response.headers.get("set-cookie", "")
 

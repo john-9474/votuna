@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
 from typing import List, Any, Literal
 import os
@@ -31,10 +31,11 @@ class Settings(BaseSettings):
     USER_FILES_DIR: str = "user_files"
     MAX_AVATAR_BYTES: int = 5 * 1024 * 1024
 
-    class Config:
-        # Look for .env in repo root for local development
-        env_file = os.path.join(os.path.dirname(__file__), "../../../.env")
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=os.path.join(os.path.dirname(__file__), "../../../.env"),
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     @field_validator('ALLOWED_ORIGINS', mode='before')
     @classmethod

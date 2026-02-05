@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import uuid
 
 from app.crud.votuna_playlist_invite import votuna_playlist_invite_crud
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
@@ -13,6 +14,14 @@ def test_create_invite_owner(auth_client, votuna_playlist):
     data = response.json()
     assert data["playlist_id"] == votuna_playlist.id
     assert data["token"]
+
+
+def test_create_invite_non_owner_forbidden(other_auth_client, votuna_playlist):
+    response = other_auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites",
+        json={"expires_in_hours": 1, "max_uses": 1},
+    )
+    assert response.status_code == 403
 
 
 def test_join_with_invite_creates_membership(other_auth_client, db_session, votuna_playlist, other_user):
@@ -53,3 +62,44 @@ def test_join_with_expired_invite_fails(other_auth_client, db_session, votuna_pl
 
     response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.token}/join")
     assert response.status_code == 400
+
+
+def test_join_with_fully_used_invite_fails(other_auth_client, db_session, votuna_playlist):
+    token = f"invite-token-{uuid.uuid4().hex}"
+    invite = votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "token": token,
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "max_uses": 1,
+            "uses_count": 1,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+        },
+    )
+
+    response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.token}/join")
+    assert response.status_code == 400
+
+
+def test_join_with_invite_existing_member_does_not_increment_usage(auth_client, db_session, votuna_playlist):
+    token = f"invite-token-{uuid.uuid4().hex}"
+    invite = votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "token": token,
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "max_uses": 2,
+            "uses_count": 0,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+        },
+    )
+
+    response = auth_client.post(f"/api/v1/votuna/invites/{invite.token}/join")
+    assert response.status_code == 200
+    invite_row = votuna_playlist_invite_crud.get_by_token(db_session, invite.token)
+    assert invite_row is not None
+    assert invite_row.uses_count == 0

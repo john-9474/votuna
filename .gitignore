@@ -152,3 +152,6 @@ bun.lockb
 
 # User uploads
 api/user_files/
+
+# Test files
+api/user_files_test/

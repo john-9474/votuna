@@ -41,3 +41,8 @@ def test_list_members_with_suggested_count(auth_client, db_session, votuna_playl
     counts = {member["user_id"]: member["suggested_count"] for member in data}
     assert counts[user.id] == 2
     assert counts[other_user.id] == 1
+
+
+def test_list_members_non_member_forbidden(other_auth_client, votuna_playlist):
+    response = other_auth_client.get(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members")
+    assert response.status_code == 403

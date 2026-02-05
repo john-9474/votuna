@@ -51,6 +51,6 @@ def test_avatar_upload_and_fetch(auth_client, user):
 
 def test_avatar_redirect_for_remote(auth_client, db_session, user):
     user_crud.update(db_session, user, {"avatar_url": "http://example.com/avatar.png"})
-    response = auth_client.get(f"/api/v1/users/{user.id}/avatar", allow_redirects=False)
+    response = auth_client.get(f"/api/v1/users/{user.id}/avatar", follow_redirects=False)
     assert response.status_code in {302, 307}
     assert response.headers.get("location") == "http://example.com/avatar.png"

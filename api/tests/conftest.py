@@ -11,7 +11,7 @@ os.environ.setdefault(
     "DATABASE_URL",
     "postgresql://user:pass@localhost:5432/test_db",
 )
-os.environ.setdefault("AUTH_SECRET_KEY", "test-secret")
+os.environ.setdefault("AUTH_SECRET_KEY", "test-secret-key-32-characters-long")
 os.environ.setdefault("USER_FILES_DIR", "user_files_test")
 
 from app.db.session import Base, get_db
