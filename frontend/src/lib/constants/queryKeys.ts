@@ -13,6 +13,8 @@ export const queryKeys = {
     ['votunaTracks', playlistId] as const,
   votunaMembers: (playlistId: string | undefined) =>
     ['votunaMembers', playlistId] as const,
+  votunaInvites: (playlistId: string | undefined) =>
+    ['votunaInvites', playlistId] as const,
   votunaManagementSourceTracks: (
     playlistId: string | undefined,
     sourceKey: string,
@@ -25,4 +27,9 @@ export const queryKeys = {
     playlistId: string | undefined,
     sourceKey: string,
   ) => ['votunaManagementFacets', playlistId, sourceKey] as const,
+  votunaInviteCandidates: (
+    playlistId: string | undefined,
+    query: string,
+    limit: number,
+  ) => ['votunaInviteCandidates', playlistId, query, limit] as const,
 }

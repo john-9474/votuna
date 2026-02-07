@@ -36,6 +36,15 @@ class ProviderTrack:
     url: str | None = None
 
 
+@dataclass
+class ProviderUser:
+    provider_user_id: str
+    username: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    profile_url: str | None = None
+
+
 class MusicProviderClient:
     """Abstract provider client interface."""
 
@@ -70,6 +79,14 @@ class MusicProviderClient:
 
     async def resolve_track_url(self, url: str) -> ProviderTrack:
         """Resolve a provider track URL to canonical track metadata."""
+        raise NotImplementedError
+
+    async def search_users(self, query: str, limit: int = 10) -> Sequence[ProviderUser]:
+        """Search provider users by free-text query."""
+        raise NotImplementedError
+
+    async def get_user(self, provider_user_id: str) -> ProviderUser:
+        """Fetch a provider user by provider-specific id."""
         raise NotImplementedError
 
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:

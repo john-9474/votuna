@@ -125,7 +125,11 @@ export default function PlaylistDetailPage() {
                   onRequiredVotePercentChange={state.setRequiredVotePercent}
                   onAutoAddOnThresholdChange={state.setAutoAddOnThreshold}
                 />
-                <CollaboratorsSection members={state.members} isLoading={state.isMembersLoading} />
+                <CollaboratorsSection
+                  members={state.members}
+                  isLoading={state.isMembersLoading}
+                  invites={state.invites}
+                />
               </div>
             </TabPanel>
           </TabPanels>

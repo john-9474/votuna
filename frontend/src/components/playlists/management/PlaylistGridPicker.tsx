@@ -58,15 +58,12 @@ export default function PlaylistGridPicker({
                     : 'bg-[rgba(var(--votuna-paper),0.88)] text-[rgb(var(--votuna-ink))]'
                 }`}
               >
-                {isSelected ? 'Selected' : option.sourceTypeLabel}
+                {isSelected ? 'Selected' : ''}
               </span>
             </div>
             <div className="p-3">
               <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
                 {option.label}
-              </p>
-              <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
-                {option.sourceTypeLabel}
               </p>
             </div>
           </button>
@@ -75,4 +72,3 @@ export default function PlaylistGridPicker({
     </div>
   )
 }
-

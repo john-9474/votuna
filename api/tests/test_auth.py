@@ -3,6 +3,8 @@ from fastapi.responses import RedirectResponse
 
 from app.config.settings import settings
 from app.crud.user import user_crud
+from app.crud.votuna_playlist_invite import votuna_playlist_invite_crud
+from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 
 
 class DummyOpenID:
@@ -54,6 +56,21 @@ def test_login_redirect(client, monkeypatch):
     assert response.headers["location"] == "https://example.com/login"
 
 
+def test_login_redirect_with_invite_context_sets_cookies(client, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
+    response = client.get(
+        "/api/v1/auth/login/soundcloud?invite_token=test-token&next=/playlists/123",
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 307}
+    assert response.headers["location"] == "https://example.com/login"
+    set_cookie_header = response.headers.get("set-cookie", "")
+    assert "votuna_pending_invite_token" in set_cookie_header
+    assert "votuna_pending_next" in set_cookie_header
+
+
 def test_callback_creates_user_and_sets_cookie(client, db_session, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 
@@ -65,6 +82,51 @@ def test_callback_creates_user_and_sets_cookie(client, db_session, monkeypatch):
     user = user_crud.get_by_provider_id(db_session, "soundcloud", "sc-user")
     assert user is not None
     assert user.email == "user@example.com"
+
+
+def test_callback_auto_joins_invite_and_redirects_to_playlist(
+    client,
+    db_session,
+    monkeypatch,
+    votuna_playlist,
+):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
+    invite = votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "invite_type": "user",
+            "token": "pending-token-1",
+            "expires_at": None,
+            "max_uses": 1,
+            "uses_count": 0,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+            "target_auth_provider": "soundcloud",
+            "target_provider_user_id": "sc-user",
+            "target_username_snapshot": "TestUser",
+            "target_user_id": None,
+            "accepted_by_user_id": None,
+            "accepted_at": None,
+        },
+    )
+    response = client.get(
+        "/api/v1/auth/callback/soundcloud",
+        cookies={
+            "votuna_pending_invite_token": invite.token,
+            "votuna_pending_next": f"/playlists/{votuna_playlist.id}",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 307}
+    assert response.headers["location"].endswith(f"/playlists/{votuna_playlist.id}")
+
+    user = user_crud.get_by_provider_id(db_session, "soundcloud", "sc-user")
+    assert user is not None
+    membership = votuna_playlist_member_crud.get_member(db_session, votuna_playlist.id, user.id)
+    assert membership is not None
 
 
 def test_logout_clears_cookie(client):

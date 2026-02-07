@@ -40,3 +40,14 @@ def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
     return user
+
+
+def get_optional_current_user(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Resolve authenticated user or return None when unauthenticated."""
+    try:
+        return get_current_user(request, db)
+    except HTTPException:
+        return None

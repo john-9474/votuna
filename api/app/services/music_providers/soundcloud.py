@@ -1,5 +1,6 @@
 """SoundCloud provider integration."""
 from typing import Any, Sequence
+from urllib.parse import urlparse
 import httpx
 
 from app.config.settings import settings
@@ -7,6 +8,7 @@ from app.services.music_providers.base import (
     MusicProviderClient,
     ProviderPlaylist,
     ProviderTrack,
+    ProviderUser,
     ProviderAuthError,
     ProviderAPIError,
 )
@@ -55,6 +57,79 @@ class SoundcloudProvider(MusicProviderClient):
             artwork_url=payload.get("artwork_url") or user.get("avatar_url"),
             url=payload.get("permalink_url"),
         )
+
+    def _to_provider_user(self, payload: Any) -> ProviderUser | None:
+        if not isinstance(payload, dict):
+            return None
+        user_id = payload.get("id")
+        if user_id is None:
+            return None
+        display_name = payload.get("username")
+        handle = payload.get("permalink")
+        first_name = payload.get("first_name")
+        last_name = payload.get("last_name")
+        full_name = " ".join(part for part in [first_name, last_name] if part) or None
+        return ProviderUser(
+            provider_user_id=str(user_id),
+            # SoundCloud "permalink" is the profile handle used in URLs (what we show as @handle).
+            username=handle or None,
+            # SoundCloud "username" is the display name.
+            display_name=display_name or full_name or handle,
+            avatar_url=payload.get("avatar_url"),
+            profile_url=payload.get("permalink_url"),
+        )
+
+    def _extract_handle_query(self, query: str) -> str | None:
+        value = query.strip()
+        if not value:
+            return None
+        if value.startswith("@"):
+            value = value[1:].strip()
+        elif value.startswith("http://") or value.startswith("https://"):
+            parsed = urlparse(value)
+            if "soundcloud.com" not in (parsed.netloc or ""):
+                return None
+            segments = [segment for segment in parsed.path.split("/") if segment]
+            if not segments:
+                return None
+            value = segments[0]
+        elif "soundcloud.com/" in value:
+            try:
+                parsed = urlparse(f"https://{value}")
+                segments = [segment for segment in parsed.path.split("/") if segment]
+                if not segments:
+                    return None
+                value = segments[0]
+            except Exception:
+                return None
+        value = value.strip()
+        if not value or "/" in value or " " in value:
+            return None
+        return value
+
+    async def _resolve_user_by_handle(self, handle: str) -> ProviderUser | None:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=15, follow_redirects=True) as client:
+            response = await client.get(
+                "/resolve",
+                headers=self._headers(),
+                params={
+                    **self._params(),
+                    "url": f"https://soundcloud.com/{handle}",
+                },
+            )
+            try:
+                self._raise_for_status(response)
+            except ProviderAPIError as exc:
+                if exc.status_code in {400, 404}:
+                    return None
+                raise
+            payload = response.json()
+        if not isinstance(payload, dict):
+            return None
+        kind = payload.get("kind")
+        if kind and kind != "user":
+            return None
+        return self._to_provider_user(payload)
 
     async def list_playlists(self) -> Sequence[ProviderPlaylist]:
         async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
@@ -205,6 +280,69 @@ class SoundcloudProvider(MusicProviderClient):
         if not mapped_track:
             raise ProviderAPIError("Unable to resolve track URL", status_code=404)
         return mapped_track
+
+    async def search_users(self, query: str, limit: int = 10) -> Sequence[ProviderUser]:
+        search_query = query.strip()
+        if not search_query:
+            return []
+        safe_limit = max(1, min(limit, 25))
+        results: list[ProviderUser] = []
+        try:
+            async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+                response = await client.get(
+                    "/users",
+                    headers=self._headers(),
+                    params={
+                        **self._params(),
+                        "q": search_query,
+                        "limit": safe_limit,
+                    },
+                )
+                self._raise_for_status(response)
+                payload = response.json()
+            if isinstance(payload, list):
+                for item in payload:
+                    mapped_user = self._to_provider_user(item)
+                    if mapped_user:
+                        results.append(mapped_user)
+        except ProviderAuthError:
+            raise
+        except ProviderAPIError:
+            # Keep invite lookup usable even when SoundCloud user search is flaky.
+            pass
+
+        handle_query = self._extract_handle_query(search_query)
+        if handle_query:
+            try:
+                resolved_user = await self._resolve_user_by_handle(handle_query)
+            except ProviderAuthError:
+                raise
+            except ProviderAPIError:
+                resolved_user = None
+            if resolved_user:
+                existing_ids = {user.provider_user_id for user in results}
+                if resolved_user.provider_user_id not in existing_ids:
+                    results.insert(0, resolved_user)
+        if len(results) > safe_limit:
+            results = results[:safe_limit]
+        return results
+
+    async def get_user(self, provider_user_id: str) -> ProviderUser:
+        user_id = provider_user_id.strip()
+        if not user_id:
+            raise ProviderAPIError("Provider user id is required", status_code=400)
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+            response = await client.get(
+                f"/users/{user_id}",
+                headers=self._headers(),
+                params=self._params(),
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+        mapped_user = self._to_provider_user(payload)
+        if not mapped_user:
+            raise ProviderAPIError("Provider user not found", status_code=404)
+        return mapped_user
 
     async def add_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         if not track_ids:

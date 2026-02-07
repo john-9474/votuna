@@ -167,3 +167,48 @@ export type PlaylistMember = {
   joined_at: string
   suggested_count: number
 }
+
+export type InviteCandidate = {
+  source: 'registered' | 'provider'
+  provider_user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  profile_url?: string | null
+  is_registered: boolean
+  registered_user_id?: number | null
+}
+
+export type CreateInviteRequest =
+  | {
+      kind: 'user'
+      target_provider_user_id: string
+    }
+  | {
+      kind: 'link'
+      expires_in_hours?: number
+      max_uses?: number
+    }
+
+export type PlaylistInvite = {
+  id: number
+  playlist_id: number
+  invite_type: 'link' | 'user'
+  token: string
+  expires_at?: string | null
+  max_uses?: number | null
+  uses_count: number
+  is_revoked: boolean
+  target_auth_provider?: string | null
+  target_provider_user_id?: string | null
+  target_username_snapshot?: string | null
+  target_display_name?: string | null
+  target_username?: string | null
+  target_avatar_url?: string | null
+  target_user_id?: number | null
+  accepted_by_user_id?: number | null
+  accepted_at?: string | null
+  invite_url?: string | null
+  created_at: string
+  updated_at: string
+}

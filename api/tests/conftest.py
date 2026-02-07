@@ -18,12 +18,17 @@ os.environ.setdefault("USER_FILES_DIR", "user_files_test")
 from app.db.session import Base, get_db
 import app.models  # noqa: F401
 from main import app
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_current_user, get_optional_current_user
 from app.crud.user import user_crud
 from app.crud.votuna_playlist import votuna_playlist_crud
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
-from app.services.music_providers.base import ProviderAPIError, ProviderPlaylist, ProviderTrack
+from app.services.music_providers.base import (
+    ProviderAPIError,
+    ProviderPlaylist,
+    ProviderTrack,
+    ProviderUser,
+)
 
 
 class DummyProvider:
@@ -87,6 +92,26 @@ class DummyProvider:
         url="https://soundcloud.com/test/resolved-track",
     )
     track_exists_value = False
+    users_by_provider_id = {
+        "provider-user-1": ProviderUser(
+            provider_user_id="provider-user-1",
+            username="provider-user-1",
+            display_name="Provider User One",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-1",
+        ),
+    }
+    search_users_results = [
+        ProviderUser(
+            provider_user_id="provider-user-1",
+            username="provider-user-1",
+            display_name="Provider User One",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-1",
+        ),
+    ]
+    search_users_calls = 0
+    get_user_calls = 0
     add_tracks_calls: list[dict] = []
     fail_add_chunk_for_track_ids: set[str] = set()
     fail_add_single_for_track_ids: set[str] = set()
@@ -139,6 +164,19 @@ class DummyProvider:
 
             raise ProviderAPIError("Resolved URL is not a track", status_code=400)
         return self.resolved_track
+
+    async def search_users(self, query: str, limit: int = 10):
+        type(self).search_users_calls += 1
+        if not query.strip():
+            return []
+        return self.search_users_results[:limit]
+
+    async def get_user(self, provider_user_id: str):
+        type(self).get_user_calls += 1
+        user = self.users_by_provider_id.get(provider_user_id)
+        if not user:
+            raise ProviderAPIError("Provider user not found", status_code=404)
+        return user
 
     async def add_tracks(self, provider_playlist_id: str, track_ids):
         normalized_ids = [str(track_id) for track_id in track_ids]
@@ -276,15 +314,19 @@ def other_user(db_session):
 @pytest.fixture()
 def auth_client(client, user):
     app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_optional_current_user] = lambda: user
     yield client
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_optional_current_user, None)
 
 
 @pytest.fixture()
 def other_auth_client(client, other_user):
     app.dependency_overrides[get_current_user] = lambda: other_user
+    app.dependency_overrides[get_optional_current_user] = lambda: other_user
     yield client
     app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_optional_current_user, None)
 
 
 @pytest.fixture()
@@ -387,6 +429,40 @@ def provider_stub(monkeypatch):
         url="https://soundcloud.com/test/resolved-track",
     )
     DummyProvider.track_exists_value = False
+    DummyProvider.users_by_provider_id = {
+        "provider-user-1": ProviderUser(
+            provider_user_id="provider-user-1",
+            username="provider-user-1",
+            display_name="Provider User One",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-1",
+        ),
+        "provider-user-2": ProviderUser(
+            provider_user_id="provider-user-2",
+            username="provider-user-2",
+            display_name="Provider User Two",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-2",
+        ),
+    }
+    DummyProvider.search_users_results = [
+        ProviderUser(
+            provider_user_id="provider-user-1",
+            username="provider-user-1",
+            display_name="Provider User One",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-1",
+        ),
+        ProviderUser(
+            provider_user_id="provider-user-2",
+            username="provider-user-2",
+            display_name="Provider User Two",
+            avatar_url=None,
+            profile_url="https://soundcloud.com/provider-user-2",
+        ),
+    ]
+    DummyProvider.search_users_calls = 0
+    DummyProvider.get_user_calls = 0
     DummyProvider.add_tracks_calls = []
     DummyProvider.fail_add_chunk_for_track_ids = set()
     DummyProvider.fail_add_single_for_track_ids = set()

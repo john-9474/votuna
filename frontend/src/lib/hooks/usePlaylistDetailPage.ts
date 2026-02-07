@@ -7,6 +7,7 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { usePlaylistInteractions } from '@/lib/hooks/playlistDetail/usePlaylistInteractions'
 import { usePlaylistManagement } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
 import { usePlaylistPlayer } from '@/lib/hooks/playlistDetail/usePlaylistPlayer'
+import { usePlaylistInvites } from '@/lib/hooks/playlistDetail/usePlaylistInvites'
 import { usePlaylistSettings } from '@/lib/hooks/playlistDetail/usePlaylistSettings'
 import type { PlaylistMember, ProviderTrack, Suggestion, VotunaPlaylist } from '@/lib/types/votuna'
 
@@ -106,6 +107,12 @@ export function usePlaylistDetailPage(playlistId: string | undefined) {
     queryClient,
   })
 
+  const inviteState = usePlaylistInvites({
+    playlistId,
+    canInvite: canEditSettings,
+    queryClient,
+  })
+
   return {
     playlist,
     isPlaylistLoading: playlistQuery.isLoading,
@@ -120,6 +127,7 @@ export function usePlaylistDetailPage(playlistId: string | undefined) {
     ...settingsState,
     ...interactionState,
     ...playerState,
+    invites: inviteState,
     management: managementState,
   }
 }

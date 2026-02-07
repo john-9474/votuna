@@ -124,7 +124,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       <option value="">Select a destination playlist</option>
                       {playlists.otherPlaylist.options.map((option) => (
                         <option key={option.key} value={option.key}>
-                          {option.label} - {option.sourceTypeLabel}
+                          {option.label}
                         </option>
                       ))}
                     </select>

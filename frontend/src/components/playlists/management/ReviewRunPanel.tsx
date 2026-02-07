@@ -69,9 +69,7 @@ export default function ReviewRunPanel({
           {review.data.matched_sample.length > 0 ? (
             <ul className="mt-3 space-y-1 text-xs text-[color:rgb(var(--votuna-ink)/0.65)]">
               {review.data.matched_sample.slice(0, SAMPLE_LIMIT).map((track) => (
-                <li key={`matched-${track.provider_track_id}`}>
-                  {track.title} ({track.provider_track_id})
-                </li>
+                <li key={`matched-${track.provider_track_id}`}>{track.title}</li>
               ))}
             </ul>
           ) : null}
@@ -91,9 +89,9 @@ export default function ReviewRunPanel({
           </div>
           {review.runResult.failed_items.length > 0 ? (
             <ul className="mt-3 space-y-1 text-xs text-rose-500">
-              {review.runResult.failed_items.slice(0, SAMPLE_LIMIT).map((item) => (
+              {review.runResult.failed_items.slice(0, SAMPLE_LIMIT).map((item, index) => (
                 <li key={`failed-${item.provider_track_id}`}>
-                  {item.provider_track_id}: {item.error}
+                  Song {index + 1}: {item.error}
                 </li>
               ))}
             </ul>
@@ -103,4 +101,3 @@ export default function ReviewRunPanel({
     </div>
   )
 }
-
