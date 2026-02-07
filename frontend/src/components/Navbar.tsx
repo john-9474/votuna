@@ -3,6 +3,7 @@
 import { Menu } from '@headlessui/react'
 import { Button, Dialog, DialogPanel } from '@tremor/react'
 import { useQueryClient } from '@tanstack/react-query'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -92,11 +93,16 @@ export default function Navbar() {
 
   return (
     <nav className="sticky top-0 z-40 border-b border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] backdrop-blur">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-2">
         <Link href="/" className="flex items-center gap-3 text-lg font-semibold tracking-tight">
-          <span className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[rgb(var(--votuna-accent))] text-white shadow-sm shadow-orange-500/40">
-            V
-          </span>
+          <Image
+            src="/img/logo.png"
+            alt="Votuna logo"
+            width={80}
+            height={80}
+            priority
+            className="object-contain"
+          />
           <span className="text-[rgb(var(--votuna-ink))]">Votuna</span>
         </Link>
 

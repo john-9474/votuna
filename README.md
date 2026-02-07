@@ -1,201 +1,183 @@
-# Docker Setup Guide
+# Votuna
 
-This project uses Docker and Docker Compose for containerization and orchestration.
+Votuna is an open source collaborative playlist voting app.
 
-## Prerequisites
+It currently supports SoundCloud-based playlist workflows end-to-end (auth, playlist enablement, suggestions, voting, and profile management) with a FastAPI backend and Next.js frontend.
 
-- Docker (v20.10+)
-- Docker Compose (v2.0+)
+## Current Feature Status
 
-## Project Structure
+### Implemented
+- SoundCloud OAuth login with cookie-based sessions
+- Dashboard to:
+  - List provider playlists
+  - Create a new SoundCloud playlist (public/private)
+  - Enable existing SoundCloud playlists for Votuna
+- Playlist detail experience:
+  - Search SoundCloud tracks from within the playlist page
+  - Suggest tracks from search results or by pasting a track URL
+  - Vote on suggestions with voter display names in tooltip
+  - Play tracks in a persistent "Now Playing" dock
+  - Configure playlist vote settings (required vote percent, auto-add toggle)
+  - View collaborator roles and suggestion counts
+- Profile page:
+  - Edit display name, first name, last name, and email
+  - Upload avatar
+  - Save theme and email preference settings
+- API docs at `/docs` and `/redoc`
 
-```
+### Planned / In Progress
+- More music providers:
+  - Spotify login and playlist import
+  - Apple Music login and playlist import
+  - TIDAL login and playlist import
+  - Cross-provider playlist links and metadata sync
+- Playlist management tools:
+  - Bulk edit track ordering and suggestion status
+  - Merge playlists with duplicate and conflict handling
+  - Bulk archive, restore, or remove suggestions
+  - Tagging and filters for large suggestion queues
+- Collaboration and automation:
+  - Role-based moderation actions for collaborators
+  - Duplicate detection and quality rules
+  - Playlist activity feed and vote history export
+  - Webhook events for bots and external workflows
+
+## Tech Stack
+
+- Backend: FastAPI, SQLAlchemy, Alembic, PostgreSQL
+- Frontend: Next.js 14, React 18, TanStack Query, Tailwind, Tremor UI
+- Dev infra: Docker Compose
+
+## Repository Layout
+
+```text
 votuna/
-├── docker-compose.yml      # Docker Compose configuration
-├── .env                    # Environment variables
-├── api/
-│   ├── Dockerfile          # API service Dockerfile
-│   └── .dockerignore       # Files to exclude from Docker build
-└── ...
+  api/                FastAPI app, models, migrations, tests
+  frontend/           Next.js app
+  docker-compose.yml  Local multi-service orchestration
+  .env.example        Root environment template
 ```
 
-## Services
+## Quick Start (Docker)
 
-### PostgreSQL Database
-- **Image**: postgres:16-alpine
-- **Container**: votuna_postgres
-- **Port**: 5432 (default, configurable via `DB_PORT`)
-- **Credentials**: 
-  - User: `votuna_user` (configurable via `DB_USER`)
-  - Password: `votuna_password` (configurable via `DB_PASSWORD`)
-  - Database: `votuna` (configurable via `DB_NAME`)
-- **Volume**: `postgres_data` (persistent storage)
-
-### API Service
-- **Container**: votuna_api
-- **Port**: 8000 (configurable via `API_PORT`)
-- **Framework**: FastAPI + Uvicorn
-- **Depends on**: PostgreSQL (waits for health check)
-
-## Getting Started
-
-### 1. Setup Environment
-
-Copy the environment template and configure:
+### 1. Create env file
 
 ```bash
-cd votuna
-cp api/.env.example .env
+cp .env.example .env
 ```
 
-The `.env` file in the root will be used by Docker Compose.
+On Windows PowerShell:
 
-### 2. Build and Run Services
+```powershell
+Copy-Item .env.example .env
+```
+
+### 2. Configure required values in `.env`
+
+At minimum set:
+- `SOUNDCLOUD_CLIENT_ID`
+- `SOUNDCLOUD_CLIENT_SECRET`
+- `SOUNDCLOUD_REDIRECT_URI` (default is fine for local)
+- `AUTH_SECRET_KEY` (replace `change-me`)
+
+Optional but common:
+- `NEXT_PUBLIC_API_URL` (default `http://localhost:8000`)
+- `FRONTEND_URL` (default `http://localhost:3000`)
+
+### 3. Start the stack
 
 ```bash
-# Build images and start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# View API logs only
-docker-compose logs -f api
+docker compose up --build
 ```
 
-### 3. Access the Application
+### 4. Open the apps
 
-- **API**: http://localhost:8000
-- **API Documentation (Swagger)**: http://localhost:8000/docs
-- **API Documentation (ReDoc)**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/health
+- Frontend: http://localhost:3000
+- API: http://localhost:8000
+- Swagger: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- Health: http://localhost:8000/health
 
-## Common Commands
+## Local Development (without full Docker stack)
 
-### Development
+### Option A: Run DB in Docker, run API + frontend locally
+
+Start PostgreSQL only:
 
 ```bash
-# Start services in foreground (see logs)
-docker-compose up
-
-# Start services in background
-docker-compose up -d
-
-# Rebuild images
-docker-compose build
-
-# Rebuild without cache
-docker-compose build --no-cache
-
-# Stop services
-docker-compose stop
-
-# Stop and remove containers
-docker-compose down
-
-# Remove everything including volumes
-docker-compose down -v
+docker compose up -d postgres
 ```
 
-### Database
+Run API:
 
 ```bash
-# Access PostgreSQL CLI
-docker-compose exec postgres psql -U votuna_user -d votuna
-
-# Create migrations
-docker-compose exec api alembic revision --autogenerate -m "Description"
-
-# Apply migrations
-docker-compose exec api alembic upgrade head
-
-# View migration history
-docker-compose exec api alembic history
+cd api
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows PowerShell
+# .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+python main.py
 ```
 
-### Debugging
+Run frontend in another shell:
 
 ```bash
-# View container logs
-docker-compose logs api
-docker-compose logs postgres
-
-# Follow logs in real-time
-docker-compose logs -f api
-
-# Execute commands in running container
-docker-compose exec api bash
-docker-compose exec api python -c "import sys; print(sys.version)"
-
-# View container status
-docker-compose ps
-
-# Inspect container
-docker-compose exec api python -m pip list
+cd frontend
+npm install
+npm run dev
 ```
 
-## Environment Variables
+If needed, create `frontend/.env.local`:
 
-The following variables can be configured in `.env`:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
 
-### API Configuration
-- `PROJECT_NAME` - Application name (default: Votuna API)
-- `DEBUG` - Debug mode (default: False)
-- `API_PORT` - Port to expose API (default: 8000)
+## Migrations
 
-### Database Configuration
-- `DB_USER` - PostgreSQL username (default: votuna_user)
-- `DB_PASSWORD` - PostgreSQL password (default: votuna_password)
-- `DB_NAME` - PostgreSQL database name (default: votuna)
-- `DB_PORT` - PostgreSQL port (default: 5432)
-- `DATABASE_URL` - Full connection string (set automatically by Docker Compose)
+From `api/`:
 
-### SQLAlchemy
-- `SQLALCHEMY_ECHO` - Enable SQL query logging (default: False)
+```bash
+alembic revision --autogenerate -m "describe_change"
+alembic upgrade head
+alembic history
+```
 
-## Troubleshooting
+## Quality Checks
 
-### PostgreSQL Connection Failed
-- Ensure PostgreSQL service is healthy: `docker-compose ps`
-- Wait for health check to pass (first startup takes ~10 seconds)
-- Check logs: `docker-compose logs postgres`
+Frontend:
 
-### Port Already in Use
-- Change port in `.env`: `API_PORT=8001` or `DB_PORT=5433`
-- Or kill existing process: `lsof -ti:8000 | xargs kill -9`
+```bash
+cd frontend
+npm run lint
+npm run build
+```
 
-### Database Not Persisting
-- Check volume exists: `docker volume ls | grep votuna`
-- Volume data is stored in Docker's data directory (platform-dependent)
+Backend:
 
-### Building Takes Long
-- Use `docker-compose build --no-cache` to rebuild without cache
-- Ensure sufficient disk space available
+```bash
+cd api
+pytest -q
+```
 
-## Production Considerations
+Docker test profile:
 
-Before deploying to production:
+```bash
+docker compose --profile test up --build api_tests
+```
 
-1. **Change Default Credentials**
-   - Set `DB_USER` and `DB_PASSWORD` in `.env`
-   - Use strong, random passwords
+## Core API Route Groups
 
-2. **Security**
-   - Set `DEBUG=False`
-   - Configure `ALLOWED_ORIGINS` for CORS
-   - Use environment-specific `.env` files
+- `/api/v1/auth/*` - OAuth login/callback/logout
+- `/api/v1/users/*` - current user profile, settings, avatar
+- `/api/v1/playlists/*` - provider playlist listing/creation
+- `/api/v1/votuna/*` - Votuna playlists, settings, suggestions, votes, members, invites
 
-3. **Database**
-   - Set up automated backups for `postgres_data` volume
-   - Consider managed database services (AWS RDS, etc.)
+## Notes
 
-4. **Updates**
-   - Keep base images updated (Python, PostgreSQL)
-   - Regularly update dependencies in `requirements.txt`
-
-## Additional Resources
-
-- [Docker Documentation](https://docs.docker.com/)
-- [Docker Compose Documentation](https://docs.docker.com/compose/)
-- [PostgreSQL Docker Image](https://hub.docker.com/_/postgres)
-- [FastAPI Docker Guide](https://fastapi.tiangolo.com/deployment/docker/)
+- Root `.env` is used by both Docker Compose and backend settings loading.
+- In local development, ensure `ALLOWED_ORIGINS` includes your frontend host.
+- SoundCloud is the active provider today; Spotify, Apple Music, and TIDAL are planned.

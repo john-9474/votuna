@@ -27,30 +27,114 @@ type VotunaPlaylist = {
 
 /** Landing page hero content. */
 function Landing() {
+  const statusItems = [
+    'SoundCloud login',
+    'Create playlists (public or private)',
+    'Enable existing SoundCloud playlists for voting',
+    'Search tracks and suggest by link',
+    'Vote counts with voter names in tooltips',
+    'Playlist settings and collaborator list',
+  ]
+
+  const featureCards = [
+    {
+      title: 'Playlist dashboard',
+      description:
+        'View SoundCloud playlists, create a new one, or enable an existing one.',
+      detail: 'New playlists support public/private mode.',
+    },
+    {
+      title: 'Search and suggest',
+      description:
+        'Search SoundCloud tracks inside a playlist and suggest them without leaving the page.',
+      detail: 'Direct track URL suggestions are also supported.',
+    },
+    {
+      title: 'Voting workflow',
+      description: 'Members vote on active suggestions and each suggestion tracks its vote total.',
+      detail: 'Tooltip displays who voted.',
+    },
+    {
+      title: 'Player dock',
+      description: 'Play tracks from search results, suggestions, and current playlist tracks.',
+      detail: 'The now-playing panel stays docked at the bottom.',
+    },
+    {
+      title: 'Playlist controls',
+      description: 'Owners can set required vote percent and auto-add behavior per playlist.',
+      detail: 'Collaborator panel shows roles and suggestion counts.',
+    },
+    {
+      title: 'User profile',
+      description: 'Edit profile fields, avatar, theme, and email preference settings.',
+      detail: 'Updates sync across the app.',
+    },
+  ]
+
+  const workflowSteps = [
+    'Log in with SoundCloud.',
+    'Create or enable a playlist on your dashboard.',
+    'Invite people to suggest tracks and vote.',
+    'Move tracks forward based on your playlist settings.',
+  ]
+
+  const plannedFeatureGroups = [
+    {
+      title: 'More music providers',
+      items: [
+        'Spotify login and playlist import',
+        'Apple Music login and playlist import',
+        'TIDAL login and playlist import',
+        'Cross-provider playlist links and metadata sync',
+      ],
+    },
+    {
+      title: 'Playlist management tools',
+      items: [
+        'Bulk edit track ordering and suggestion status',
+        'Merge playlists with duplicate and conflict handling',
+        'Bulk archive, restore, or remove suggestions',
+        'Tagging and filters for large suggestion queues',
+      ],
+    },
+    {
+      title: 'Collaboration and automation',
+      items: [
+        'Role-based moderation actions for collaborators',
+        'Duplicate detection and quality rules',
+        'Playlist activity feed and vote history export',
+        'Webhook events for bots and external workflows',
+      ],
+    },
+  ]
+
   return (
     <main className="relative overflow-hidden">
-      <div className="mx-auto flex min-h-[calc(100vh-84px)] w-full max-w-6xl flex-col justify-center gap-10 px-6 py-16 lg:flex-row lg:items-center">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-14 lg:flex-row lg:items-start">
         <div className="fade-up space-y-6 lg:w-3/5">
           <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2 text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.55)] shadow-sm">
             <span className="h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
-            Beta
+            Alpha
           </div>
           <h1 className="text-5xl font-semibold tracking-tight text-[rgb(var(--votuna-ink))] sm:text-6xl">
-            Run votes that feel fast, fair, and human.
+            Open source playlist voting for SoundCloud.
           </h1>
           <p className="text-lg text-[color:rgb(var(--votuna-ink)/0.7)] sm:text-xl">
-            Votuna helps you launch opinion checks, pulse surveys, and playlists votes with a clean
-            login flow and a calm, focused UI.
+            Votuna helps groups suggest tracks, vote together, and manage what gets added next.
+          </p>
+          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+            Use <span className="font-semibold">Log in</span> in the top-right to connect
+            SoundCloud and start.
           </p>
           <div className="flex flex-wrap gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.55)]">
             <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              SoundCloud ready
+              FastAPI backend
             </span>
             <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              Spotify coming soon
+              Next.js frontend
             </span>
             <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              Secure sessions
+              SoundCloud now, more providers later
             </span>
           </div>
         </div>
@@ -60,28 +144,112 @@ function Landing() {
             <div className="space-y-6">
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-                  Quick start
+                  Summary
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                  Invite your crew
+                  Current features
                 </h2>
-                <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                  Share a single link, collect votes, and keep the momentum moving.
-                </p>
               </div>
-              <div className="grid gap-4 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                <div className="rounded-2xl border border-orange-100 bg-[rgba(var(--votuna-accent-soft),0.5)] p-4">
-                  <p className="text-[color:rgb(var(--votuna-ink)/0.55)]">Login provider</p>
-                  <p className="mt-2 text-base font-semibold text-[rgb(var(--votuna-ink))]">SoundCloud</p>
-                </div>
-                <div className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] p-4">
-                  <p className="text-[color:rgb(var(--votuna-ink)/0.55)]">Default flow</p>
-                  <p className="mt-2 text-base font-semibold text-[rgb(var(--votuna-ink))]">API + Frontend</p>
-                </div>
-              </div>
+              <ul className="space-y-2 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]">
+                {statusItems.map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </Card>
         </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-6xl px-6 pb-16 pt-8">
+        <Card className="fade-up-delay rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
+                Overview
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
+                Current features
+              </h2>
+            </div>
+            <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+              Based on functionality that is available today.
+            </p>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {featureCards.map((feature) => (
+              <div
+                key={feature.title}
+                className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] p-4"
+              >
+                <p className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{feature.title}</p>
+                <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
+                  {feature.description}
+                </p>
+                <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">{feature.detail}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="fade-up-delay-lg mt-6 rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+          <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
+            How it works
+          </p>
+          <ol className="mt-4 grid gap-3 md:grid-cols-2">
+            {workflowSteps.map((step, index) => (
+              <li
+                key={step}
+                className="flex items-center gap-3 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] px-4 py-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(var(--votuna-accent-soft),0.9)] text-xs font-semibold text-[rgb(var(--votuna-ink))]">
+                  {index + 1}
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </Card>
+
+        <Card className="fade-up-delay-lg mt-6 rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
+                Roadmap
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
+                Planned features
+              </h2>
+            </div>
+            <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+              Priority and scope may change as development continues.
+            </p>
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+            {plannedFeatureGroups.map((group) => (
+              <div
+                key={group.title}
+                className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] p-4"
+              >
+                <p className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{group.title}</p>
+                <ul className="mt-3 space-y-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
+                  {group.items.map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[rgb(var(--votuna-accent))]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        
       </div>
     </main>
   )
