@@ -1,0 +1,331 @@
+import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import SurfaceCard from '@/components/ui/SurfaceCard'
+import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
+
+import FacetSelector from './FacetSelector'
+import PlaylistGridPicker from './PlaylistGridPicker'
+import ReviewRunPanel from './ReviewRunPanel'
+
+type MergingBulkEditingSectionProps = {
+  management: PlaylistManagementState
+}
+
+export default function MergingBulkEditingSection({ management }: MergingBulkEditingSectionProps) {
+  const { action, playlists, songScope, steps } = management
+  const { sourcePicker } = songScope
+  const {
+    limit: sourceTrackLimit,
+    offset: sourceTrackOffset,
+    totalCount: sourceTrackTotalCount,
+    setOffset: setSourceTrackOffset,
+  } = sourcePicker.pagination
+
+  const selectedSongIdSet = new Set(sourcePicker.selectedSongIds)
+  const canPageBack = sourceTrackOffset > 0
+  const nextOffset = sourceTrackOffset + sourceTrackLimit
+  const canPageForward = nextOffset < sourceTrackTotalCount
+  const rangeStart = sourceTrackTotalCount === 0 ? 0 : sourceTrackOffset + 1
+  const rangeEnd =
+    sourceTrackTotalCount === 0
+      ? 0
+      : Math.min(sourceTrackOffset + sourceTrackLimit, sourceTrackTotalCount)
+
+  return (
+    <SurfaceCard>
+      <SectionEyebrow>Merging</SectionEyebrow>
+      <div className="mt-2">
+        <h3 className="text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
+          Copy songs between playlists
+        </h3>
+      </div>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)]">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+              What do you want to do?
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => action.setValue('add_to_this_playlist')}
+                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
+                  action.value === 'add_to_this_playlist'
+                    ? 'border-transparent bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                    : 'border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]'
+                }`}
+              >
+                Add songs to this playlist
+              </button>
+              <button
+                type="button"
+                onClick={() => action.setValue('copy_to_another_playlist')}
+                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
+                  action.value === 'copy_to_another_playlist'
+                    ? 'border-transparent bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                    : 'border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]'
+                }`}
+              >
+                Copy songs to another playlist
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+              Choose playlists
+            </p>
+
+            {action.value === 'add_to_this_playlist' ? (
+              <div className="mt-3">
+                <p className="mb-2 text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
+                  Pick the playlist to copy songs from.
+                </p>
+                <PlaylistGridPicker
+                  options={playlists.otherPlaylist.options}
+                  selectedKey={playlists.otherPlaylist.selectedKey}
+                  onSelect={playlists.otherPlaylist.setSelectedKey}
+                />
+              </div>
+            ) : (
+              <div className="mt-3 space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => playlists.destination.setMode('existing')}
+                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                      playlists.destination.mode === 'existing'
+                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
+                    }`}
+                  >
+                    Existing playlist
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => playlists.destination.setMode('create')}
+                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                      playlists.destination.mode === 'create'
+                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
+                    }`}
+                  >
+                    Create new playlist
+                  </button>
+                </div>
+
+                {!playlists.destination.isCreatingNew ? (
+                  <div>
+                    <select
+                      value={playlists.otherPlaylist.selectedKey}
+                      onChange={(event) => playlists.otherPlaylist.setSelectedKey(event.target.value)}
+                      className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                    >
+                      <option value="">Select a destination playlist</option>
+                      {playlists.otherPlaylist.options.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.label} - {option.sourceTypeLabel}
+                        </option>
+                      ))}
+                    </select>
+                    {!playlists.otherPlaylist.hasOptions ? (
+                      <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+                        No eligible playlists found yet. Create or sync another playlist first.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+                        New playlist name
+                      </p>
+                      <input
+                        value={playlists.destination.createForm.title}
+                        onChange={(event) =>
+                          playlists.destination.createForm.setTitle(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        placeholder="Playlist name"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+                        Description
+                      </p>
+                      <input
+                        value={playlists.destination.createForm.description}
+                        onChange={(event) =>
+                          playlists.destination.createForm.setDescription(event.target.value)
+                        }
+                        className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        placeholder="Optional description"
+                      />
+                    </div>
+                    <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)] sm:col-span-2">
+                      <input
+                        type="checkbox"
+                        checked={playlists.destination.createForm.isPublic}
+                        onChange={(event) =>
+                          playlists.destination.createForm.setIsPublic(event.target.checked)
+                        }
+                      />
+                      Create as public playlist
+                    </label>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+              Choose songs
+            </p>
+            {!steps.canProceedFromPlaylists ? (
+              <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                Choose playlists first to load song options.
+              </p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                <select
+                  value={songScope.value}
+                  onChange={(event) => songScope.setValue(event.target.value as typeof songScope.value)}
+                  className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                >
+                  <option value="all">All songs</option>
+                  <option value="genre">Only specific genres</option>
+                  <option value="artist">Only specific artists</option>
+                  <option value="songs">Pick songs manually</option>
+                </select>
+
+                {songScope.value === 'genre' ? (
+                  <FacetSelector
+                    label="Genres"
+                    customPlaceholder="Add a genre (example: house)"
+                    selectedValues={songScope.genre.selectedValues}
+                    suggestions={songScope.genre.suggestions}
+                    customInput={songScope.genre.customInput}
+                    onCustomInputChange={songScope.genre.setCustomInput}
+                    onAddCustomValue={songScope.genre.addCustomValue}
+                    onToggleSuggestion={songScope.genre.toggleSuggestion}
+                    onRemoveValue={songScope.genre.removeValue}
+                    isLoading={songScope.genre.isLoading}
+                    status={songScope.genre.status}
+                  />
+                ) : null}
+
+                {songScope.value === 'artist' ? (
+                  <FacetSelector
+                    label="Artists"
+                    customPlaceholder="Add an artist (example: DJ Seinfeld)"
+                    selectedValues={songScope.artist.selectedValues}
+                    suggestions={songScope.artist.suggestions}
+                    customInput={songScope.artist.customInput}
+                    onCustomInputChange={songScope.artist.setCustomInput}
+                    onAddCustomValue={songScope.artist.addCustomValue}
+                    onToggleSuggestion={songScope.artist.toggleSuggestion}
+                    onRemoveValue={songScope.artist.removeValue}
+                    isLoading={songScope.artist.isLoading}
+                    status={songScope.artist.status}
+                  />
+                ) : null}
+
+                {songScope.value === 'songs' ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Pick songs</p>
+                        <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                          Selected songs: {sourcePicker.selectedSongIds.length}
+                        </p>
+                      </div>
+                      <div className="w-full max-w-sm">
+                        <input
+                          value={sourcePicker.search}
+                          onChange={(event) => sourcePicker.setSearch(event.target.value)}
+                          className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                          placeholder="Search songs in source playlist"
+                        />
+                      </div>
+                    </div>
+
+                    {sourcePicker.status ? (
+                      <p className="text-xs text-rose-500">{sourcePicker.status}</p>
+                    ) : null}
+
+                    {sourcePicker.isLoading ? (
+                      <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading songs...</p>
+                    ) : sourcePicker.tracks.length === 0 ? (
+                      <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                        No songs found for this source playlist.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sourcePicker.tracks.map((track) => (
+                          <label
+                            key={track.provider_track_id}
+                            className="flex items-center gap-3 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)] px-4 py-3 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedSongIdSet.has(track.provider_track_id)}
+                              onChange={() => sourcePicker.toggleSelectedSong(track.provider_track_id)}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-[rgb(var(--votuna-ink))]">
+                                {track.title}
+                              </p>
+                              <p className="truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                                {track.artist || 'Unknown artist'}
+                                {track.genre ? ` - ${track.genre}` : ''}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.56)]">
+                        Showing {rangeStart}-{rangeEnd} of {sourceTrackTotalCount}
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={!canPageBack}
+                          onClick={() =>
+                            setSourceTrackOffset(Math.max(0, sourceTrackOffset - sourceTrackLimit))
+                          }
+                          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-xs disabled:opacity-50"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canPageForward}
+                          onClick={() => setSourceTrackOffset(nextOffset)}
+                          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-xs disabled:opacity-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div>
+          <ReviewRunPanel
+            sourceLabel={playlists.sourceLabel}
+            destinationLabel={playlists.destinationLabel}
+            review={management.review}
+          />
+        </div>
+      </div>
+    </SurfaceCard>
+  )
+}

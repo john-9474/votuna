@@ -1,78 +1,127 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type {
-  ManagementDirection,
   ManagementExecuteResponse,
   ManagementPlaylistRef,
   ManagementPreviewResponse,
-  ManagementSelectionMode,
   ManagementSourceTracksResponse,
   VotunaPlaylist,
 } from '@/lib/types/votuna'
 import { useManagementCounterparty } from '@/lib/hooks/playlistDetail/management/useManagementCounterparty'
+import { useManagementFacets } from '@/lib/hooks/playlistDetail/management/useManagementFacets'
+import {
+  actionToDirection,
+  addUniqueValue,
+  hasValue,
+  removeValue,
+  type ManagementAction,
+  type ManagementSongScope,
+} from '@/lib/hooks/playlistDetail/management/shared'
+import {
+  useManagementTransfer,
+  type ManagementReviewStatus,
+} from '@/lib/hooks/playlistDetail/management/useManagementTransfer'
 import { useManagementSourceTracks } from '@/lib/hooks/playlistDetail/management/useManagementSourceTracks'
-import { useManagementTransfer } from '@/lib/hooks/playlistDetail/management/useManagementTransfer'
+
+type ManagementFacetValue = {
+  value: string
+  count: number
+}
+
+type ManagementFacetSelectionState = {
+  selectedValues: string[]
+  suggestions: ManagementFacetValue[]
+  customInput: string
+  setCustomInput: (value: string) => void
+  addCustomValue: () => void
+  toggleSuggestion: (value: string) => void
+  removeValue: (value: string) => void
+  isLoading: boolean
+  status: string
+}
 
 export type PlaylistManagementState = {
   permissions: {
     canManage: boolean
   }
-  builder: {
-    direction: ManagementDirection
-    setDirection: (value: ManagementDirection) => void
-    exportTargetMode: 'existing' | 'create'
-    setExportTargetMode: (value: 'existing' | 'create') => void
-    isCreatingDestination: boolean
-    counterpartyOptions: Array<{ key: string; label: string; detail: string }>
-    selectedCounterpartyKey: string
-    setSelectedCounterpartyKey: (value: string) => void
-    destinationCreate: {
-      title: string
-      setTitle: (value: string) => void
-      description: string
-      setDescription: (value: string) => void
-      isPublic: boolean
-      setIsPublic: (value: boolean) => void
+  utilitySections: Array<{
+    id: string
+    title: string
+    description: string
+  }>
+  steps: {
+    canProceedFromAction: boolean
+    canProceedFromPlaylists: boolean
+    canProceedFromSongScope: boolean
+  }
+  action: {
+    value: ManagementAction
+    setValue: (value: ManagementAction) => void
+    applyQuickAction: () => void
+  }
+  playlists: {
+    thisPlaylistLabel: string
+    sourceLabel: string
+    destinationLabel: string
+    otherPlaylist: {
+      options: Array<{
+        key: string
+        label: string
+        sourceTypeLabel: string
+        imageUrl: string | null
+      }>
+      selectedKey: string
+      setSelectedKey: (value: string) => void
+      hasOptions: boolean
     }
-    selection: {
-      mode: ManagementSelectionMode
-      setMode: (value: ManagementSelectionMode) => void
-      valuesInput: string
-      setValuesInput: (value: string) => void
+    destination: {
+      mode: 'existing' | 'create'
+      setMode: (value: 'existing' | 'create') => void
+      isCreatingNew: boolean
+      createForm: {
+        title: string
+        setTitle: (value: string) => void
+        description: string
+        setDescription: (value: string) => void
+        isPublic: boolean
+        setIsPublic: (value: boolean) => void
+      }
     }
   }
-  sourcePicker: {
-    search: string
-    setSearch: (value: string) => void
-    pagination: {
-      limit: number
-      offset: number
-      totalCount: number
-      setOffset: (value: number) => void
+  songScope: {
+    value: ManagementSongScope
+    setValue: (value: ManagementSongScope) => void
+    genre: ManagementFacetSelectionState
+    artist: ManagementFacetSelectionState
+    sourcePicker: {
+      search: string
+      setSearch: (value: string) => void
+      pagination: {
+        limit: number
+        offset: number
+        totalCount: number
+        setOffset: (value: number) => void
+      }
+      tracks: ManagementSourceTracksResponse['tracks']
+      selectedSongIds: string[]
+      toggleSelectedSong: (trackId: string) => void
+      isLoading: boolean
+      status: string
     }
-    tracks: ManagementSourceTracksResponse['tracks']
-    selectedSongIds: string[]
-    toggleSelectedSong: (trackId: string) => void
-    isLoading: boolean
-    status: string
   }
-  preview: {
-    canRun: boolean
-    isPending: boolean
+  review: {
+    status: ManagementReviewStatus
+    isFresh: boolean
+    isUpdating: boolean
     data: ManagementPreviewResponse | null
     error: string
-    run: () => void
-  }
-  execute: {
+    idleMessage: string
     canRun: boolean
-    isPending: boolean
-    data: ManagementExecuteResponse | null
-    error: string
     run: () => void
-  }
-  actions: {
-    applyMergePreset: () => void
+    isRunning: boolean
+    runResult: ManagementExecuteResponse | null
+    runError: string
   }
 }
 
@@ -84,6 +133,27 @@ type UsePlaylistManagementArgs = {
   queryClient: QueryClient
 }
 
+const DEFAULT_UTILITY_SECTIONS = [
+  {
+    id: 'duplicate-cleanup',
+    title: 'Duplicate cleanup',
+    description: 'Coming soon: remove duplicate songs inside a playlist.',
+  },
+  {
+    id: 'reorder-tools',
+    title: 'Reorder tools',
+    description: 'Coming soon: reorder manually or apply smart sort presets.',
+  },
+  {
+    id: 'more-utilities',
+    title: 'More utilities',
+    description: 'Coming soon: additional bulk playlist management actions.',
+  },
+]
+
+const updateSelectionWithToggle = (values: string[], value: string) =>
+  hasValue(values, value) ? removeValue(values, value) : addUniqueValue(values, value)
+
 export function usePlaylistManagement({
   playlistId,
   playlist,
@@ -91,13 +161,19 @@ export function usePlaylistManagement({
   currentUserId,
   queryClient,
 }: UsePlaylistManagementArgs): PlaylistManagementState {
-  const [direction, setDirection] = useState<ManagementDirection>('import_to_current')
-  const [exportTargetMode, setExportTargetMode] = useState<'existing' | 'create'>('existing')
+  const [action, setAction] = useState<ManagementAction>('add_to_this_playlist')
+  const [destinationMode, setDestinationMode] = useState<'existing' | 'create'>('existing')
   const [destinationCreateTitle, setDestinationCreateTitle] = useState('')
   const [destinationCreateDescription, setDestinationCreateDescription] = useState('')
   const [destinationCreateIsPublic, setDestinationCreateIsPublic] = useState(false)
-  const [selectionMode, setSelectionMode] = useState<ManagementSelectionMode>('all')
-  const [selectionValuesInput, setSelectionValuesInput] = useState('')
+  const [songScope, setSongScope] = useState<ManagementSongScope>('all')
+
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([])
+  const [genreCustomInput, setGenreCustomInput] = useState('')
+  const [selectedArtists, setSelectedArtists] = useState<string[]>([])
+  const [artistCustomInput, setArtistCustomInput] = useState('')
+
+  const direction = actionToDirection(action)
 
   const counterpartyState = useManagementCounterparty({
     playlist,
@@ -111,122 +187,266 @@ export function usePlaylistManagement({
     selectedCounterpartyRef,
   } = counterpartyState
 
+  const isCreatingDestination = action === 'copy_to_another_playlist' && destinationMode === 'create'
+
   useEffect(() => {
-    if (direction !== 'export_from_current' || exportTargetMode !== 'create') return
+    if (!isCreatingDestination) return
     setSelectedCounterpartyKey('')
-  }, [direction, exportTargetMode, setSelectedCounterpartyKey])
+  }, [isCreatingDestination, setSelectedCounterpartyKey])
 
   const sourceRefForPicker = useMemo<ManagementPlaylistRef | null>(() => {
     if (!playlist) return null
-    if (direction === 'import_to_current') {
+    if (action === 'add_to_this_playlist') {
       return selectedCounterpartyRef
     }
     return {
       kind: 'votuna',
       votuna_playlist_id: playlist.id,
     }
-  }, [playlist, direction, selectedCounterpartyRef])
+  }, [playlist, action, selectedCounterpartyRef])
 
   const sourceTrackState = useManagementSourceTracks({
     playlistId,
     canManage,
-    selectionMode,
+    selectionMode: songScope,
     sourceRef: sourceRefForPicker,
   })
   const { resetSourceTracks } = sourceTrackState
 
   useEffect(() => {
     resetSourceTracks()
-  }, [direction, selectedCounterpartyKey, exportTargetMode, resetSourceTracks])
+  }, [action, selectedCounterpartyKey, destinationMode, resetSourceTracks])
+
+  const facetsState = useManagementFacets({
+    playlistId,
+    canManage: canManage && (songScope === 'genre' || songScope === 'artist'),
+    sourceRef: sourceRefForPicker,
+  })
+
+  const transferSelectionValues = useMemo(() => {
+    if (songScope === 'all') return []
+    if (songScope === 'songs') return sourceTrackState.selectedSongIds
+    if (songScope === 'genre') return selectedGenres
+    return selectedArtists
+  }, [
+    songScope,
+    sourceTrackState.selectedSongIds,
+    selectedGenres,
+    selectedArtists,
+  ])
 
   const transferState = useManagementTransfer({
     playlistId,
     queryClient,
     direction,
-    exportTargetMode,
+    exportTargetMode: destinationMode,
     selectedCounterpartyRef,
     destinationCreateTitle,
     destinationCreateDescription,
     destinationCreateIsPublic,
-    selectionMode,
-    selectionValuesInput,
-    selectedSongIds: sourceTrackState.selectedSongIds,
+    selectionMode: songScope,
+    selectionValues: transferSelectionValues,
   })
 
-  const applyMergePreset = () => {
-    setDirection('import_to_current')
-    setExportTargetMode('existing')
-    setSelectionMode('all')
-    setSelectionValuesInput('')
+  const selectedCounterpartyOption = useMemo(
+    () => counterpartyOptions.find((option) => option.key === selectedCounterpartyKey) ?? null,
+    [counterpartyOptions, selectedCounterpartyKey],
+  )
+
+  const thisPlaylistLabel = playlist?.title || 'This playlist'
+  const otherPlaylistLabel = selectedCounterpartyOption?.label || 'Other playlist'
+  const destinationCreateLabel = destinationCreateTitle.trim() || 'New playlist'
+
+  const sourceLabel =
+    action === 'add_to_this_playlist' ? otherPlaylistLabel : thisPlaylistLabel
+  const destinationLabel =
+    action === 'add_to_this_playlist'
+      ? thisPlaylistLabel
+      : isCreatingDestination
+        ? destinationCreateLabel
+        : otherPlaylistLabel
+
+  const canProceedFromAction = true
+  const canProceedFromPlaylists = action === 'add_to_this_playlist'
+    ? Boolean(selectedCounterpartyKey)
+    : isCreatingDestination
+      ? Boolean(destinationCreateTitle.trim())
+      : Boolean(selectedCounterpartyKey)
+
+  const canProceedFromSongScope =
+    songScope === 'all'
+      ? true
+      : songScope === 'songs'
+        ? sourceTrackState.selectedSongIds.length > 0
+        : songScope === 'genre'
+          ? selectedGenres.length > 0
+          : selectedArtists.length > 0
+
+  const reviewIdleMessage = useMemo(() => {
+    if (!canProceedFromPlaylists) {
+      if (action === 'add_to_this_playlist') {
+        return 'Choose the playlist you want to copy songs from.'
+      }
+      if (isCreatingDestination) {
+        return 'Enter a name for the new destination playlist.'
+      }
+      return 'Choose the playlist you want to copy songs to.'
+    }
+
+    if (!canProceedFromSongScope) {
+      if (songScope === 'songs') return 'Pick at least one song.'
+      if (songScope === 'genre') return 'Choose at least one genre or add a custom genre.'
+      if (songScope === 'artist') return 'Choose at least one artist or add a custom artist.'
+    }
+
+    if (transferState.reviewStatus === 'loading') {
+      return 'Updating review...'
+    }
+
+    if (transferState.canReview && transferState.reviewStatus === 'idle') {
+      return 'Set your choices to review what will be copied.'
+    }
+
+    return ''
+  }, [
+    canProceedFromPlaylists,
+    action,
+    isCreatingDestination,
+    canProceedFromSongScope,
+    songScope,
+    transferState.reviewStatus,
+    transferState.canReview,
+  ])
+
+  const applyQuickAction = () => {
+    setAction('add_to_this_playlist')
+    setDestinationMode('existing')
+    setSongScope('all')
+    setSelectedGenres([])
+    setSelectedArtists([])
+    setGenreCustomInput('')
+    setArtistCustomInput('')
     resetSourceTracks()
   }
 
-  const isCreatingDestination =
-    direction === 'export_from_current' && exportTargetMode === 'create'
+  const addGenreCustomValue = useCallback(() => {
+    const trimmedValue = genreCustomInput.trim()
+    if (!trimmedValue) return
+    setSelectedGenres((prev) => addUniqueValue(prev, trimmedValue))
+    setGenreCustomInput('')
+  }, [genreCustomInput])
+
+  const addArtistCustomValue = useCallback(() => {
+    const trimmedValue = artistCustomInput.trim()
+    if (!trimmedValue) return
+    setSelectedArtists((prev) => addUniqueValue(prev, trimmedValue))
+    setArtistCustomInput('')
+  }, [artistCustomInput])
 
   return {
     permissions: {
       canManage,
     },
-    builder: {
-      direction,
-      setDirection,
-      exportTargetMode,
-      setExportTargetMode,
-      isCreatingDestination,
-      counterpartyOptions: counterpartyOptions.map(({ key, label, detail }) => ({
-        key,
-        label,
-        detail,
-      })),
-      selectedCounterpartyKey,
-      setSelectedCounterpartyKey,
-      destinationCreate: {
-        title: destinationCreateTitle,
-        setTitle: setDestinationCreateTitle,
-        description: destinationCreateDescription,
-        setDescription: setDestinationCreateDescription,
-        isPublic: destinationCreateIsPublic,
-        setIsPublic: setDestinationCreateIsPublic,
+    utilitySections: DEFAULT_UTILITY_SECTIONS,
+    steps: {
+      canProceedFromAction,
+      canProceedFromPlaylists,
+      canProceedFromSongScope,
+    },
+    action: {
+      value: action,
+      setValue: (value) => {
+        setAction(value)
+        if (value === 'add_to_this_playlist') {
+          setDestinationMode('existing')
+        }
       },
-      selection: {
-        mode: selectionMode,
-        setMode: setSelectionMode,
-        valuesInput: selectionValuesInput,
-        setValuesInput: setSelectionValuesInput,
+      applyQuickAction,
+    },
+    playlists: {
+      thisPlaylistLabel,
+      sourceLabel,
+      destinationLabel,
+      otherPlaylist: {
+        options: counterpartyOptions.map((option) => ({
+          key: option.key,
+          label: option.label,
+          sourceTypeLabel: option.sourceTypeLabel,
+          imageUrl: option.imageUrl ?? null,
+        })),
+        selectedKey: selectedCounterpartyKey,
+        setSelectedKey: setSelectedCounterpartyKey,
+        hasOptions: counterpartyOptions.length > 0,
+      },
+      destination: {
+        mode: destinationMode,
+        setMode: setDestinationMode,
+        isCreatingNew: isCreatingDestination,
+        createForm: {
+          title: destinationCreateTitle,
+          setTitle: setDestinationCreateTitle,
+          description: destinationCreateDescription,
+          setDescription: setDestinationCreateDescription,
+          isPublic: destinationCreateIsPublic,
+          setIsPublic: setDestinationCreateIsPublic,
+        },
       },
     },
-    sourcePicker: {
-      search: sourceTrackState.sourceTrackSearch,
-      setSearch: sourceTrackState.setSourceTrackSearch,
-      pagination: {
-        limit: sourceTrackState.sourceTrackLimit,
-        offset: sourceTrackState.sourceTrackOffset,
-        totalCount: sourceTrackState.sourceTrackTotalCount,
-        setOffset: sourceTrackState.setSourceTrackOffset,
+    songScope: {
+      value: songScope,
+      setValue: setSongScope,
+      genre: {
+        selectedValues: selectedGenres,
+        suggestions: facetsState.genreSuggestions,
+        customInput: genreCustomInput,
+        setCustomInput: setGenreCustomInput,
+        addCustomValue: addGenreCustomValue,
+        toggleSuggestion: (value) =>
+          setSelectedGenres((prev) => updateSelectionWithToggle(prev, value)),
+        removeValue: (value) => setSelectedGenres((prev) => removeValue(prev, value)),
+        isLoading: facetsState.isFacetsLoading,
+        status: facetsState.facetsStatus,
       },
-      tracks: sourceTrackState.sourceTracks,
-      selectedSongIds: sourceTrackState.selectedSongIds,
-      toggleSelectedSong: sourceTrackState.toggleSelectedSong,
-      isLoading: sourceTrackState.isSourceTracksLoading,
-      status: sourceTrackState.sourceTracksStatus,
+      artist: {
+        selectedValues: selectedArtists,
+        suggestions: facetsState.artistSuggestions,
+        customInput: artistCustomInput,
+        setCustomInput: setArtistCustomInput,
+        addCustomValue: addArtistCustomValue,
+        toggleSuggestion: (value) =>
+          setSelectedArtists((prev) => updateSelectionWithToggle(prev, value)),
+        removeValue: (value) => setSelectedArtists((prev) => removeValue(prev, value)),
+        isLoading: facetsState.isFacetsLoading,
+        status: facetsState.facetsStatus,
+      },
+      sourcePicker: {
+        search: sourceTrackState.sourceTrackSearch,
+        setSearch: sourceTrackState.setSourceTrackSearch,
+        pagination: {
+          limit: sourceTrackState.sourceTrackLimit,
+          offset: sourceTrackState.sourceTrackOffset,
+          totalCount: sourceTrackState.sourceTrackTotalCount,
+          setOffset: sourceTrackState.setSourceTrackOffset,
+        },
+        tracks: sourceTrackState.sourceTracks,
+        selectedSongIds: sourceTrackState.selectedSongIds,
+        toggleSelectedSong: sourceTrackState.toggleSelectedSong,
+        isLoading: sourceTrackState.isSourceTracksLoading,
+        status: sourceTrackState.sourceTracksStatus,
+      },
     },
-    preview: {
-      canRun: transferState.canPreview,
-      isPending: transferState.isPreviewPending,
+    review: {
+      status: transferState.reviewStatus,
+      isFresh: transferState.isReviewFresh,
+      isUpdating: transferState.isReviewLoading,
       data: transferState.preview,
       error: transferState.previewError,
-      run: transferState.onPreview,
-    },
-    execute: {
+      idleMessage: reviewIdleMessage,
       canRun: transferState.canExecute,
-      isPending: transferState.isExecutePending,
-      data: transferState.executeResult,
-      error: transferState.executeError,
       run: transferState.onExecute,
-    },
-    actions: {
-      applyMergePreset,
+      isRunning: transferState.isExecutePending,
+      runResult: transferState.executeResult,
+      runError: transferState.executeError,
     },
   }
 }

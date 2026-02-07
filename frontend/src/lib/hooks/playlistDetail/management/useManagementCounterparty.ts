@@ -52,7 +52,8 @@ export function useManagementCounterparty({
       options.push({
         key: `provider:${providerPlaylist.provider}:${providerPlaylist.provider_playlist_id}`,
         label: providerPlaylist.title,
-        detail: 'Provider playlist',
+        sourceTypeLabel: 'Music provider playlist',
+        imageUrl: providerPlaylist.image_url ?? null,
         ref: {
           kind: 'provider',
           provider: providerPlaylist.provider,
@@ -72,7 +73,8 @@ export function useManagementCounterparty({
       options.push({
         key: `votuna:${votunaPlaylist.id}`,
         label: votunaPlaylist.title,
-        detail: 'Votuna playlist',
+        sourceTypeLabel: 'Votuna playlist',
+        imageUrl: votunaPlaylist.image_url ?? null,
         ref: {
           kind: 'votuna',
           votuna_playlist_id: votunaPlaylist.id,
@@ -80,7 +82,7 @@ export function useManagementCounterparty({
       })
     }
 
-    return options
+    return options.sort((left, right) => left.label.localeCompare(right.label))
   }, [
     playlist,
     providerPlaylistsQuery.data,

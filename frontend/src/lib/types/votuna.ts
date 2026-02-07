@@ -15,6 +15,7 @@ export type VotunaPlaylist = {
   owner_user_id: number
   title: string
   description?: string | null
+  image_url?: string | null
   provider: string
   provider_playlist_id: string
   is_active: boolean
@@ -82,6 +83,21 @@ export type ManagementSourceTracksResponse = {
   total_count: number
   limit: number
   offset: number
+}
+
+export type ManagementFacetCount = {
+  value: string
+  count: number
+}
+
+export type ManagementFacetsRequest = {
+  source: ManagementPlaylistRef
+}
+
+export type ManagementFacetsResponse = {
+  genres: ManagementFacetCount[]
+  artists: ManagementFacetCount[]
+  total_tracks_considered: number
 }
 
 export type ManagementTransferRequest = {

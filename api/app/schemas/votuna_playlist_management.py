@@ -46,6 +46,21 @@ class ManagementSourceTracksResponse(BaseModel):
     offset: int
 
 
+class ManagementFacetsRequest(BaseModel):
+    source: ManagementPlaylistRef
+
+
+class ManagementFacetCount(BaseModel):
+    value: str
+    count: int
+
+
+class ManagementFacetsResponse(BaseModel):
+    genres: list[ManagementFacetCount] = Field(default_factory=list)
+    artists: list[ManagementFacetCount] = Field(default_factory=list)
+    total_tracks_considered: int
+
+
 class ManagementTransferRequest(BaseModel):
     direction: ManagementDirection
     counterparty: ManagementPlaylistRef | None = None

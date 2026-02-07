@@ -17,6 +17,9 @@ from app.models.user import User
 from app.models.votuna_playlist import VotunaPlaylist
 from app.schemas.votuna_playlist import MusicProvider, ProviderTrackOut
 from app.schemas.votuna_playlist_management import (
+    ManagementFacetCount,
+    ManagementFacetsRequest,
+    ManagementFacetsResponse,
     ManagementDestinationCreate,
     ManagementExecuteResponse,
     ManagementFailedItem,
@@ -35,6 +38,7 @@ router = APIRouter()
 MAX_TRACKS_PER_ACTION = 500
 ADD_CHUNK_SIZE = 100
 PREVIEW_SAMPLE_SIZE = 10
+FACETS_LIMIT = 100
 
 
 @dataclass
@@ -119,6 +123,29 @@ def _contains_search(track: ProviderTrack, needle: str) -> bool:
     artist = (track.artist or "").lower()
     genre = (track.genre or "").lower()
     return needle in title or needle in artist or needle in genre
+
+
+def _build_facet_counts(values: Iterable[str | None]) -> list[ManagementFacetCount]:
+    counts: dict[str, int] = {}
+    display_values: dict[str, str] = {}
+
+    for raw_value in values:
+        if raw_value is None:
+            continue
+        value = raw_value.strip()
+        if not value:
+            continue
+        normalized = _normalize(value)
+        counts[normalized] = counts.get(normalized, 0) + 1
+        if normalized not in display_values:
+            display_values[normalized] = value
+
+    facets = [
+        ManagementFacetCount(value=display_values[key], count=counts[key])
+        for key in counts
+    ]
+    facets.sort(key=lambda facet: (-facet.count, facet.value.lower(), facet.value))
+    return facets[:FACETS_LIMIT]
 
 
 def _filter_tracks_by_selection(
@@ -351,6 +378,40 @@ async def list_management_source_tracks(
         total_count=len(filtered_tracks),
         limit=payload.limit,
         offset=payload.offset,
+    )
+
+
+@router.post(
+    "/playlists/{playlist_id}/management/facets",
+    response_model=ManagementFacetsResponse,
+)
+async def list_management_facets(
+    playlist_id: int,
+    payload: ManagementFacetsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List aggregated source facets for genre and artist suggestions."""
+    current_playlist = require_owner(db, playlist_id, current_user.id)
+    client = get_owner_client(db, current_playlist)
+    source = await _resolve_playlist_ref(
+        db=db,
+        current_playlist=current_playlist,
+        current_user=current_user,
+        client=client,
+        ref=payload.source,
+    )
+    tracks = await _safe_list_tracks(
+        client=client,
+        provider_playlist_id=source.provider_playlist_id,
+        current_user=current_user,
+        owner_id=current_playlist.owner_user_id,
+    )
+
+    return ManagementFacetsResponse(
+        genres=_build_facet_counts(track.genre for track in tracks),
+        artists=_build_facet_counts(track.artist for track in tracks),
+        total_tracks_considered=len(tracks),
     )
 
 

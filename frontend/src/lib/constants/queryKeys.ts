@@ -21,4 +21,8 @@ export const queryKeys = {
     offset: number,
   ) =>
     ['votunaManagementSourceTracks', playlistId, sourceKey, search, limit, offset] as const,
+  votunaManagementFacets: (
+    playlistId: string | undefined,
+    sourceKey: string,
+  ) => ['votunaManagementFacets', playlistId, sourceKey] as const,
 }

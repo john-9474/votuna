@@ -72,8 +72,8 @@ export default function PlaylistDetailPage() {
         <TabGroup>
           <TabList className="rounded-full bg-[rgba(var(--votuna-paper),0.85)] p-1">
             <Tab className="rounded-full px-4 py-2 text-sm">Playlist</Tab>
-            <Tab className="rounded-full px-4 py-2 text-sm">Settings</Tab>
             <Tab className="rounded-full px-4 py-2 text-sm">Manage</Tab>
+            <Tab className="rounded-full px-4 py-2 text-sm">Settings</Tab>
           </TabList>
           <TabPanels>
             <TabPanel>
@@ -111,6 +111,9 @@ export default function PlaylistDetailPage() {
               </div>
             </TabPanel>
             <TabPanel>
+              <PlaylistManagementSection management={state.management} />
+            </TabPanel>
+            <TabPanel>
               <div className="space-y-6">
                 <PlaylistSettingsSection
                   requiredVotePercent={state.settingsForm.required_vote_percent}
@@ -124,9 +127,6 @@ export default function PlaylistDetailPage() {
                 />
                 <CollaboratorsSection members={state.members} isLoading={state.isMembersLoading} />
               </div>
-            </TabPanel>
-            <TabPanel>
-              <PlaylistManagementSection management={state.management} />
             </TabPanel>
           </TabPanels>
         </TabGroup>

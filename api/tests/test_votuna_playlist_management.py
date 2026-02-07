@@ -365,3 +365,117 @@ def test_source_tracks_search_and_pagination(auth_client, votuna_playlist, provi
     assert page_data["limit"] == 1
     assert page_data["offset"] == 1
     assert len(page_data["tracks"]) == 1
+
+
+def test_facets_owner_success_with_sorting_and_normalization(auth_client, votuna_playlist, provider_stub):
+    provider_stub.tracks_by_playlist_id["source-1"] = [
+        ProviderTrack(provider_track_id="t-1", title="Alpha", artist="DJ Zebra", genre=" House "),
+        ProviderTrack(provider_track_id="t-2", title="Beta", artist="dj zebra", genre="house"),
+        ProviderTrack(provider_track_id="t-3", title="Gamma", artist="DJ Alpha", genre="Techno"),
+        ProviderTrack(provider_track_id="t-4", title="Delta", artist="DJ Alpha", genre="techno"),
+        ProviderTrack(provider_track_id="t-5", title="Empty", artist="", genre=""),
+        ProviderTrack(provider_track_id="t-6", title="None", artist=None, genre=None),
+    ]
+
+    response = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/facets",
+        json={
+            "source": {
+                "kind": "provider",
+                "provider": "soundcloud",
+                "provider_playlist_id": "source-1",
+            }
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["total_tracks_considered"] == 6
+    assert data["genres"] == [
+        {"value": "House", "count": 2},
+        {"value": "Techno", "count": 2},
+    ]
+    assert data["artists"] == [
+        {"value": "DJ Alpha", "count": 2},
+        {"value": "DJ Zebra", "count": 2},
+    ]
+
+
+def test_facets_non_owner_forbidden(other_auth_client, votuna_playlist):
+    response = other_auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/facets",
+        json={
+            "source": {
+                "kind": "provider",
+                "provider": "soundcloud",
+                "provider_playlist_id": "source-1",
+            }
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_facets_votuna_counterparty_not_owned_forbidden(
+    auth_client,
+    db_session,
+    other_user,
+    votuna_playlist,
+):
+    foreign_playlist = _create_owned_votuna_playlist(db_session, other_user)
+    response = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/facets",
+        json={
+            "source": {
+                "kind": "votuna",
+                "votuna_playlist_id": foreign_playlist.id,
+            }
+        },
+    )
+    assert response.status_code == 403
+
+
+def test_facets_empty_and_top_100_cap(auth_client, votuna_playlist, provider_stub):
+    provider_stub.tracks_by_playlist_id["empty-source"] = [
+        ProviderTrack(provider_track_id="e-1", title="Empty", artist=None, genre=None),
+        ProviderTrack(provider_track_id="e-2", title="Blank", artist=" ", genre=" "),
+    ]
+    empty_response = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/facets",
+        json={
+            "source": {
+                "kind": "provider",
+                "provider": "soundcloud",
+                "provider_playlist_id": "empty-source",
+            }
+        },
+    )
+    assert empty_response.status_code == 200
+    empty_data = empty_response.json()
+    assert empty_data["total_tracks_considered"] == 2
+    assert empty_data["genres"] == []
+    assert empty_data["artists"] == []
+
+    provider_stub.tracks_by_playlist_id["large-source"] = [
+        ProviderTrack(
+            provider_track_id=f"t-{index}",
+            title=f"Track {index}",
+            artist=f"Artist {index}",
+            genre=f"Genre {index}",
+        )
+        for index in range(120)
+    ]
+    cap_response = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/facets",
+        json={
+            "source": {
+                "kind": "provider",
+                "provider": "soundcloud",
+                "provider_playlist_id": "large-source",
+            }
+        },
+    )
+    assert cap_response.status_code == 200
+    cap_data = cap_response.json()
+    assert cap_data["total_tracks_considered"] == 120
+    assert len(cap_data["genres"]) == 100
+    assert len(cap_data["artists"]) == 100
