@@ -49,6 +49,14 @@ export type PlayerTrack = {
   artwork_url?: string | null
 }
 
+export type TrackPlayRequest = {
+  key: string
+  title: string
+  artist?: string | null
+  url?: string | null
+  artworkUrl?: string | null
+}
+
 export type PlaylistMember = {
   user_id: number
   display_name?: string | null
