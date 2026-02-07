@@ -126,48 +126,7 @@ export default function PlaylistDetailPage() {
               </div>
             </TabPanel>
             <TabPanel>
-              <PlaylistManagementSection
-                canManage={state.management.canManage}
-                direction={state.management.direction}
-                onDirectionChange={state.management.setDirection}
-                exportTargetMode={state.management.exportTargetMode}
-                onExportTargetModeChange={state.management.setExportTargetMode}
-                counterpartyOptions={state.management.counterpartyOptions}
-                selectedCounterpartyKey={state.management.selectedCounterpartyKey}
-                onSelectedCounterpartyKeyChange={state.management.setSelectedCounterpartyKey}
-                destinationCreateTitle={state.management.destinationCreateTitle}
-                onDestinationCreateTitleChange={state.management.setDestinationCreateTitle}
-                destinationCreateDescription={state.management.destinationCreateDescription}
-                onDestinationCreateDescriptionChange={state.management.setDestinationCreateDescription}
-                destinationCreateIsPublic={state.management.destinationCreateIsPublic}
-                onDestinationCreateIsPublicChange={state.management.setDestinationCreateIsPublic}
-                selectionMode={state.management.selectionMode}
-                onSelectionModeChange={state.management.setSelectionMode}
-                selectionValuesInput={state.management.selectionValuesInput}
-                onSelectionValuesInputChange={state.management.setSelectionValuesInput}
-                onApplyMergePreset={state.management.applyMergePreset}
-                sourceTrackSearch={state.management.sourceTrackSearch}
-                onSourceTrackSearchChange={state.management.setSourceTrackSearch}
-                sourceTrackLimit={state.management.sourceTrackLimit}
-                sourceTrackOffset={state.management.sourceTrackOffset}
-                sourceTrackTotalCount={state.management.sourceTrackTotalCount}
-                onSourceTrackPageChange={state.management.setSourceTrackOffset}
-                sourceTracks={state.management.sourceTracks}
-                selectedSongIds={state.management.selectedSongIds}
-                onToggleSelectedSong={state.management.toggleSelectedSong}
-                isSourceTracksLoading={state.management.isSourceTracksLoading}
-                sourceTracksStatus={state.management.sourceTracksStatus}
-                canPreview={state.management.canPreview}
-                isPreviewPending={state.management.isPreviewPending}
-                onPreview={state.management.onPreview}
-                preview={state.management.preview}
-                previewError={state.management.previewError}
-                canExecute={state.management.canExecute}
-                isExecutePending={state.management.isExecutePending}
-                onExecute={state.management.onExecute}
-                executeResult={state.management.executeResult}
-                executeError={state.management.executeError}
-              />
+              <PlaylistManagementSection management={state.management} />
             </TabPanel>
           </TabPanels>
         </TabGroup>
