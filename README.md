@@ -19,6 +19,13 @@ It currently supports SoundCloud-based playlist workflows end-to-end (auth, play
   - Play tracks in a persistent "Now Playing" dock
   - Configure playlist vote settings (required vote percent, auto-add toggle)
   - View collaborator roles and suggestion counts
+  - Manage tab (owner-only):
+    - Import another playlist into the current playlist
+    - Export the current playlist into an existing playlist or a newly created playlist
+    - Filter transfers by `all`, `genre`, `artist`, or selected `songs`
+    - Preview transfer results before execute (matched, to-add, duplicates)
+    - Execute with duplicate skip behavior and failure summary
+    - Source-track picker with search and pagination for song selection
 - Profile page:
   - Edit display name, first name, last name, and email
   - Upload avatar
@@ -32,10 +39,10 @@ It currently supports SoundCloud-based playlist workflows end-to-end (auth, play
   - TIDAL login and playlist import
   - Cross-provider playlist links and metadata sync
 - Playlist management tools:
-  - Bulk edit track ordering and suggestion status
-  - Merge playlists with duplicate and conflict handling
-  - Bulk archive, restore, or remove suggestions
-  - Tagging and filters for large suggestion queues
+  - Bulk remove selected tracks from a playlist
+  - Duplicate cleanup utility inside a playlist
+  - Reorder tools (manual drag/drop + auto-sort presets)
+  - Operation history, undo checkpoints, and replay options
 - Collaboration and automation:
   - Role-based moderation actions for collaborators
   - Duplicate detection and quality rules
@@ -174,7 +181,7 @@ docker compose --profile test up --build api_tests
 - `/api/v1/auth/*` - OAuth login/callback/logout
 - `/api/v1/users/*` - current user profile, settings, avatar
 - `/api/v1/playlists/*` - provider playlist listing/creation
-- `/api/v1/votuna/*` - Votuna playlists, settings, suggestions, votes, members, invites
+- `/api/v1/votuna/*` - Votuna playlists, settings, suggestions, votes, members, invites, management transfer endpoints
 
 ## Notes
 

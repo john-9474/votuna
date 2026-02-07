@@ -1,121 +1,125 @@
-# FastAPI Backend Template
+# Votuna API
 
-A production-ready FastAPI backend template for the Votuna project.
+FastAPI backend for Votuna's collaborative playlist workflows.
 
-## Project Structure
+## Current Scope
 
-```
+- OAuth login/callback + session cookie auth
+- Provider playlist listing and creation APIs
+- Votuna playlist enablement and settings
+- Suggestions and voting with collaborator/member support
+- Playlist management transfer endpoints (import/export with preview and execute)
+
+Runtime provider client support is currently **SoundCloud** (`get_music_provider`), even though API schemas include additional provider enums for forward compatibility.
+
+## Playlist Management (Implemented)
+
+Owner-only transfer workflows are available under `/api/v1/votuna/playlists/{playlist_id}/management/*`:
+
+- `POST /source-tracks`
+  - Browse source tracks for song-level selection
+  - Search by title/artist/genre
+  - Offset/limit pagination
+- `POST /preview`
+  - Non-mutating transfer preview
+  - Supports `all`, `genre`, `artist`, `songs` filters
+  - Reports matched/to-add/duplicate counts
+  - Enforces max 500 tracks per action
+- `POST /execute`
+  - Runs the transfer with duplicate skip behavior
+  - Optional destination playlist creation on export
+  - Best-effort add with per-track fallback on chunk failure
+  - Returns added/skipped/failed summary
+
+## Project Layout
+
+```text
 api/
-+-- main.py                 # Application entry point
-+-- requirements.txt        # Python dependencies
-+-- .env.example            # Environment variables template
-+-- alembic/                # Migrations
-+-- app/
-    +-- __init__.py
-    +-- api/
-    |   +-- __init__.py
-    |   +-- v1/
-    |       +-- __init__.py
-    |       +-- router.py   # API router
-    |       +-- routes/     # Route modules
-    +-- config/
-    |   +-- __init__.py
-    |   +-- settings.py     # Configuration and settings
-    +-- crud/               # CRUD helpers
-    +-- db/
-    |   +-- session.py      # DB session / Base
-    +-- models/             # SQLAlchemy models
-    +-- schemas/            # Pydantic schemas
+  main.py
+  requirements.txt
+  app/
+    api/v1/routes/
+    auth/
+    config/
+    crud/
+    db/
+    models/
+    schemas/
+    services/
+  alembic/
+  tests/
 ```
 
-## Setup
+## Local Setup
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
+cd api
+python -m venv .venv
+# Linux/macOS
+source .venv/bin/activate
+# Windows PowerShell
+# .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Configure environment
 
-Copy `.env.example` to `.env` and update values as needed:
+Use the repository root `.env.example` and create `.env` at repo root.
 
-```bash
-cp .env.example .env
-```
+Required values:
 
-For Spotify auth, set:
+- `DATABASE_URL`
+- `AUTH_SECRET_KEY`
+- `SOUNDCLOUD_CLIENT_ID`
+- `SOUNDCLOUD_CLIENT_SECRET`
+- `SOUNDCLOUD_REDIRECT_URI`
+
+Optional provider auth values (not used by playlist provider client yet):
+
 - `SPOTIFY_CLIENT_ID`
 - `SPOTIFY_CLIENT_SECRET`
 - `SPOTIFY_REDIRECT_URI`
-- `AUTH_SECRET_KEY`
 
-### 3. Run the Application
+### 3. Run migrations
 
 ```bash
+cd api
+alembic upgrade head
+```
+
+### 4. Start API
+
+```bash
+cd api
 python main.py
 ```
 
-Or use uvicorn directly:
+or
 
 ```bash
+cd api
 uvicorn main:app --reload
 ```
 
-The API will be available at `http://localhost:8000`
+## Docs and Health
 
-## API Documentation
+- API root: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- Health: `http://localhost:8000/health`
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **OpenAPI Schema**: http://localhost:8000/openapi.json
+## Route Groups
 
-## Endpoints
+- `/api/v1/auth/*` - login/callback/logout
+- `/api/v1/users/*` - profile, settings, avatars
+- `/api/v1/playlists/*` - provider playlist list/create
+- `/api/v1/votuna/*` - Votuna playlists, settings, tracks, suggestions, votes, members, invites, management
 
-### Health Check
-- `GET /health` - Health check endpoint
-
-### Auth (v1)
-- `GET /api/v1/auth/login` - Start Spotify SSO login
-- `GET /api/v1/auth/callback` - Spotify OAuth callback
-- `POST /api/v1/auth/logout` - Clear auth cookie
-
-### Users (v1)
-- `GET /api/v1/users/me` - Current user profile
-- `GET /api/v1/users/me/settings` - Current user settings
-- `PUT /api/v1/users/me/settings` - Update settings
-
-## Features
-
-- [x] FastAPI framework with async support
-- [x] CORS middleware for frontend integration
-- [x] Pydantic models for data validation
-- [x] Environment configuration management
-- [x] Application lifecycle management
-- [x] Organized modular structure
-- [x] API versioning (v1)
-- [x] Auto-generated API documentation
-
-## Development
-
-To add new endpoints:
-
-1. Add route handlers in `app/api/v1/routes.py`
-2. Create Pydantic models in `app/schemas` (if needed)
-3. Import and include routers in `main.py`
-
-## Testing
-
-Run the unit tests with:
+## Tests
 
 ```bash
-pytest
-```
-
-## Production Deployment
-
-For production, use a production-grade ASGI server:
-
-```bash
-gunicorn main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker
+cd api
+pytest -q
 ```

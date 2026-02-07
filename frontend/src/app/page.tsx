@@ -34,6 +34,8 @@ function Landing() {
     'Search tracks and suggest by link',
     'Vote counts with voter names in tooltips',
     'Playlist settings and collaborator list',
+    'Manage tab for import/export between playlists',
+    'Preview transfers with duplicate and failure summary',
   ]
 
   const featureCards = [
@@ -65,6 +67,13 @@ function Landing() {
       detail: 'Collaborator panel shows roles and suggestion counts.',
     },
     {
+      title: 'Playlist management',
+      description:
+        'Owners can copy tracks between playlists with import/export flows and a preview step.',
+      detail:
+        'Filter transfers by all tracks, genre, artist, or selected songs. Export supports existing or new destination playlists.',
+    },
+    {
       title: 'User profile',
       description: 'Edit profile fields, avatar, theme, and email preference settings.',
       detail: 'Updates sync across the app.',
@@ -75,7 +84,7 @@ function Landing() {
     'Log in with SoundCloud.',
     'Create or enable a playlist on your dashboard.',
     'Invite people to suggest tracks and vote.',
-    'Move tracks forward based on your playlist settings.',
+    'Use the Manage tab to import/export tracks with preview before execution.',
   ]
 
   const plannedFeatureGroups = [
@@ -91,10 +100,10 @@ function Landing() {
     {
       title: 'Playlist management tools',
       items: [
-        'Bulk edit track ordering and suggestion status',
-        'Merge playlists with duplicate and conflict handling',
-        'Bulk archive, restore, or remove suggestions',
-        'Tagging and filters for large suggestion queues',
+        'Bulk remove selected tracks from a playlist',
+        'Duplicate cleanup utility for provider playlists',
+        'Reorder tools (manual and auto-sort presets)',
+        'Merge history, undo checkpoints, and replay options',
       ],
     },
     {
