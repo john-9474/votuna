@@ -85,6 +85,9 @@ export default function PlaylistDetailPage() {
                   isSearching={state.isSearching}
                   searchStatus={state.searchStatus}
                   searchResults={state.searchResults}
+                  optimisticSuggestedTrackIds={state.suggestedSearchTrackIds}
+                  pendingSuggestionTrackIds={state.pendingSuggestionTrackIds}
+                  inPlaylistTrackIds={state.inPlaylistTrackIds}
                   onPlayTrack={state.playTrack}
                   onSuggestFromSearch={state.suggestFromSearch}
                   isSuggestPending={state.isSuggestPending}
@@ -112,6 +115,11 @@ export default function PlaylistDetailPage() {
                   tracks={state.tracks}
                   isLoading={state.isTracksLoading}
                   onPlayTrack={state.playTrack}
+                  canRemoveTracks={state.canEditSettings}
+                  onRemoveTrack={state.removeTrack}
+                  isRemoveTrackPending={state.isRemoveTrackPending}
+                  removingTrackId={state.removingTrackId}
+                  statusMessage={state.trackActionStatus}
                 />
               </div>
             </TabPanel>

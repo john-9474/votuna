@@ -15,6 +15,9 @@ type SearchSuggestSectionProps = {
   isSearching: boolean
   searchStatus: string
   searchResults: ProviderTrack[]
+  optimisticSuggestedTrackIds: string[]
+  pendingSuggestionTrackIds: string[]
+  inPlaylistTrackIds: string[]
   onPlayTrack: (track: TrackPlayRequest) => void
   onSuggestFromSearch: (track: ProviderTrack) => void
   isSuggestPending: boolean
@@ -31,6 +34,9 @@ export default function SearchSuggestSection({
   isSearching,
   searchStatus,
   searchResults,
+  optimisticSuggestedTrackIds,
+  pendingSuggestionTrackIds,
+  inPlaylistTrackIds,
   onPlayTrack,
   onSuggestFromSearch,
   isSuggestPending,
@@ -39,6 +45,12 @@ export default function SearchSuggestSection({
   onSuggestFromLink,
   suggestStatus,
 }: SearchSuggestSectionProps) {
+  const isTrackSuggested = (providerTrackId: string) =>
+    optimisticSuggestedTrackIds.includes(providerTrackId) ||
+    pendingSuggestionTrackIds.includes(providerTrackId)
+
+  const isTrackInPlaylist = (providerTrackId: string) => inPlaylistTrackIds.includes(providerTrackId)
+
   return (
     <SurfaceCard>
       <div>
@@ -121,13 +133,31 @@ export default function SearchSuggestSection({
                       Play
                     </Button>
                   ) : null}
-                  <PrimaryButton
-                    onClick={() => onSuggestFromSearch(track)}
-                    disabled={isSuggestPending}
-                    className="w-24 justify-center"
-                  >
-                    Suggest
-                  </PrimaryButton>
+                  {isTrackInPlaylist(track.provider_track_id) ? (
+                    <Button
+                      disabled
+                      variant="secondary"
+                      className="w-24 justify-center rounded-full"
+                    >
+                      In playlist
+                    </Button>
+                  ) : isTrackSuggested(track.provider_track_id) ? (
+                    <Button
+                      disabled
+                      variant="secondary"
+                      className="w-24 justify-center rounded-full"
+                    >
+                      Suggested
+                    </Button>
+                  ) : (
+                    <PrimaryButton
+                      onClick={() => onSuggestFromSearch(track)}
+                      disabled={isSuggestPending}
+                      className="w-24 justify-center"
+                    >
+                      Suggest
+                    </PrimaryButton>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
 """Votuna playlist routes."""
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -337,3 +337,25 @@ async def list_votuna_tracks(
             )
         )
     return payload
+
+
+@router.delete("/playlists/{playlist_id}/tracks/{provider_track_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_votuna_track(
+    playlist_id: int,
+    provider_track_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove a track from the provider playlist (owner only)."""
+    playlist = require_owner(db, playlist_id, current_user.id)
+    client = get_owner_client(db, playlist)
+    track_id = provider_track_id.strip()
+    if not track_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Track id is required")
+    try:
+        await client.remove_tracks(playlist.provider_playlist_id, [track_id])
+    except ProviderAuthError:
+        raise_provider_auth(current_user, owner_id=playlist.owner_user_id)
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

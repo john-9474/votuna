@@ -115,6 +115,30 @@ def test_list_votuna_tracks(auth_client, votuna_playlist, provider_stub):
     assert data[0]["suggested_by_display_name"] is None
 
 
+def test_remove_track_owner_success(auth_client, votuna_playlist, provider_stub):
+    provider_stub.tracks_by_playlist_id[votuna_playlist.provider_playlist_id] = [
+        provider_stub.tracks[0],
+        provider_stub.tracks[1],
+    ]
+    response = auth_client.delete(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/{provider_stub.tracks[0].provider_track_id}"
+    )
+    assert response.status_code == 204
+
+    tracks_response = auth_client.get(f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks")
+    assert tracks_response.status_code == 200
+    track_ids = [track["provider_track_id"] for track in tracks_response.json()]
+    assert provider_stub.tracks[0].provider_track_id not in track_ids
+    assert provider_stub.tracks[1].provider_track_id in track_ids
+
+
+def test_remove_track_non_owner_forbidden(other_auth_client, votuna_playlist, provider_stub):
+    response = other_auth_client.delete(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/{provider_stub.tracks[0].provider_track_id}"
+    )
+    assert response.status_code == 403
+
+
 def test_list_votuna_tracks_includes_suggester(auth_client, db_session, votuna_playlist, user, provider_stub):
     votuna_track_suggestion_crud.create(
         db_session,

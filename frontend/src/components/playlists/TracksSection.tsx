@@ -1,4 +1,5 @@
 import { Button } from '@tremor/react'
+import { RiCloseLine } from '@remixicon/react'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
@@ -10,6 +11,11 @@ type TracksSectionProps = {
   tracks: ProviderTrack[]
   isLoading: boolean
   onPlayTrack: (track: TrackPlayRequest) => void
+  canRemoveTracks: boolean
+  onRemoveTrack: (providerTrackId: string) => void
+  isRemoveTrackPending: boolean
+  removingTrackId: string | null
+  statusMessage?: string
 }
 
 const formatAddedDate = (addedAt: string | null | undefined) => {
@@ -19,7 +25,19 @@ const formatAddedDate = (addedAt: string | null | undefined) => {
   return `Added ${date.toLocaleDateString()}`
 }
 
-export default function TracksSection({ tracks, isLoading, onPlayTrack }: TracksSectionProps) {
+const destructiveActionButtonClass =
+  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
+
+export default function TracksSection({
+  tracks,
+  isLoading,
+  onPlayTrack,
+  canRemoveTracks,
+  onRemoveTrack,
+  isRemoveTrackPending,
+  removingTrackId,
+  statusMessage,
+}: TracksSectionProps) {
   return (
     <SurfaceCard>
       <div className="flex items-center justify-between">
@@ -108,6 +126,29 @@ export default function TracksSection({ tracks, isLoading, onPlayTrack }: Tracks
                         Open
                       </a>
                     ) : null}
+                    {canRemoveTracks ? (
+                      <button
+                        type="button"
+                        aria-label={`Remove ${track.title}`}
+                        disabled={isRemoveTrackPending}
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            const confirmed = window.confirm(
+                              `Remove "${track.title}" from this playlist?`,
+                            )
+                            if (!confirmed) return
+                          }
+                          onRemoveTrack(track.provider_track_id)
+                        }}
+                        className={destructiveActionButtonClass}
+                      >
+                        {isRemoveTrackPending && removingTrackId === track.provider_track_id ? (
+                          '...'
+                        ) : (
+                          <RiCloseLine className="h-4 w-4" />
+                        )}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -115,6 +156,7 @@ export default function TracksSection({ tracks, isLoading, onPlayTrack }: Tracks
           ))}
         </div>
       )}
+      {statusMessage ? <p className="mt-3 text-xs text-rose-500">{statusMessage}</p> : null}
     </SurfaceCard>
   )
 }

@@ -259,6 +259,16 @@ class DummyProvider:
             existing_ids.add(track_id)
         return None
 
+    async def remove_tracks(self, provider_playlist_id: str, track_ids):
+        normalized_remove_ids = {str(track_id) for track_id in track_ids}
+        playlist_tracks = self.tracks_by_playlist_id.setdefault(provider_playlist_id, [])
+        self.tracks_by_playlist_id[provider_playlist_id] = [
+            track
+            for track in playlist_tracks
+            if str(track.provider_track_id) not in normalized_remove_ids
+        ]
+        return None
+
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         return self.track_exists_value
 

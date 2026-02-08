@@ -1,7 +1,7 @@
 import { useMutation, type QueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { apiJson, type ApiError } from '@/lib/api'
+import { apiFetch, apiJson, type ApiError } from '@/lib/api'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import type { ProviderTrack, Suggestion } from '@/lib/types/votuna'
 
@@ -33,11 +33,14 @@ function isRejectedTrackConflict(error: unknown): boolean {
 export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylistInteractionsArgs) {
   const [suggestStatus, setSuggestStatus] = useState('')
   const [suggestionsActionStatus, setSuggestionsActionStatus] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [trackActionStatus, setTrackActionStatus] = useState('')
+  const [searchQuery, setSearchQueryState] = useState('')
   const [searchResults, setSearchResults] = useState<ProviderTrack[]>([])
+  const [suggestedSearchTrackIds, setSuggestedSearchTrackIds] = useState<string[]>([])
   const [searchStatus, setSearchStatus] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [linkSuggestionUrl, setLinkSuggestionUrl] = useState('')
+  const [removingTrackId, setRemovingTrackId] = useState<string | null>(null)
 
   const invalidatePlaylistQueries = async (includeMembers: boolean) => {
     const keys = [
@@ -125,6 +128,40 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     },
   })
 
+  const removeTrackMutation = useMutation({
+    mutationFn: async (providerTrackId: string) => {
+      const response = await apiFetch(
+        `/api/v1/votuna/playlists/${playlistId}/tracks/${encodeURIComponent(providerTrackId)}`,
+        {
+          method: 'DELETE',
+          authRequired: true,
+        },
+      )
+      if (response.ok) return
+      const body = await response.json().catch(() => ({}))
+      const detail =
+        typeof body.detail === 'string'
+          ? body.detail
+          : 'Unable to remove track'
+      throw new Error(detail)
+    },
+    onMutate: (providerTrackId) => {
+      setTrackActionStatus('')
+      setRemovingTrackId(providerTrackId)
+    },
+    onSuccess: async () => {
+      setTrackActionStatus('')
+      await queryClient.invalidateQueries({ queryKey: queryKeys.votunaTracks(playlistId) })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to remove track'
+      setTrackActionStatus(message)
+    },
+    onSettled: () => {
+      setRemovingTrackId(null)
+    },
+  })
+
   const searchTracks = async () => {
     if (!playlistId || !searchQuery.trim()) return
     setSearchStatus('')
@@ -154,7 +191,25 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     })
   }
 
-  const suggestTrack = async (payload: SuggestPayload) => {
+  const markSearchTrackAsSuggested = (providerTrackId: string) => {
+    setSuggestedSearchTrackIds((prev) => {
+      if (prev.includes(providerTrackId)) return prev
+      return [...prev, providerTrackId]
+    })
+  }
+
+  const unmarkSearchTrackAsSuggested = (providerTrackId: string) => {
+    setSuggestedSearchTrackIds((prev) => prev.filter((id) => id !== providerTrackId))
+  }
+
+  const suggestTrack = async (
+    payload: SuggestPayload,
+    options?: { optimisticProviderTrackId?: string },
+  ) => {
+    const optimisticProviderTrackId = options?.optimisticProviderTrackId
+    if (optimisticProviderTrackId) {
+      markSearchTrackAsSuggested(optimisticProviderTrackId)
+    }
     setSuggestStatus('')
     try {
       await runSuggestMutation(payload, false)
@@ -165,6 +220,9 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
         )
         if (!shouldResuggest) {
           setSuggestStatus('Suggestion canceled.')
+          if (optimisticProviderTrackId) {
+            unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
+          }
           return
         }
         try {
@@ -174,11 +232,17 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
           const retryMessage =
             retryError instanceof Error ? retryError.message : 'Unable to add suggestion'
           setSuggestStatus(retryMessage)
+          if (optimisticProviderTrackId) {
+            unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
+          }
           return
         }
       }
       const message = error instanceof Error ? error.message : 'Unable to add suggestion'
       setSuggestStatus(message)
+      if (optimisticProviderTrackId) {
+        unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
+      }
     }
   }
 
@@ -189,7 +253,7 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
       track_artist: track.artist ?? null,
       track_artwork_url: track.artwork_url ?? null,
       track_url: track.url ?? null,
-    })
+    }, { optimisticProviderTrackId: track.provider_track_id })
   }
 
   const suggestFromLink = () => {
@@ -197,6 +261,13 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     void suggestTrack({
       track_url: linkSuggestionUrl.trim(),
     })
+  }
+
+  const setSearchQuery = (value: string) => {
+    setSearchQueryState(value)
+    if (value.trim()) return
+    setSearchResults([])
+    setSearchStatus('')
   }
 
   const setReaction = (suggestionId: number, reaction: 'up' | 'down') => {
@@ -214,6 +285,10 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     forceAddMutation.mutate(suggestionId)
   }
 
+  const removeTrack = (providerTrackId: string) => {
+    removeTrackMutation.mutate(providerTrackId)
+  }
+
   return {
     searchQuery,
     setSearchQuery,
@@ -221,6 +296,7 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     isSearching,
     searchStatus,
     searchResults,
+    suggestedSearchTrackIds,
     suggestStatus,
     suggestionsActionStatus,
     suggestFromSearch,
@@ -234,5 +310,9 @@ export function usePlaylistInteractions({ playlistId, queryClient }: UsePlaylist
     isCancelSuggestionPending: cancelSuggestionMutation.isPending,
     forceAddSuggestion,
     isForceAddPending: forceAddMutation.isPending,
+    removeTrack,
+    isRemoveTrackPending: removeTrackMutation.isPending,
+    removingTrackId,
+    trackActionStatus,
   }
 }

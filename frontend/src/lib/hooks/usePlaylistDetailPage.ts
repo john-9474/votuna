@@ -61,9 +61,18 @@ export function usePlaylistDetailPage(playlistId: string | undefined) {
 
   const playlist = playlistQuery.data ?? null
   const settings = playlist?.settings ?? null
-  const suggestions = suggestionsQuery.data ?? []
-  const tracks = tracksQuery.data ?? []
-  const members = membersQuery.data ?? []
+  const suggestions = useMemo(() => suggestionsQuery.data ?? [], [suggestionsQuery.data])
+  const tracks = useMemo(() => tracksQuery.data ?? [], [tracksQuery.data])
+  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data])
+
+  const pendingSuggestionTrackIds = useMemo(
+    () => suggestions.map((suggestion) => suggestion.provider_track_id),
+    [suggestions],
+  )
+  const inPlaylistTrackIds = useMemo(
+    () => tracks.map((track) => track.provider_track_id),
+    [tracks],
+  )
 
   const canEditSettings = useMemo(() => {
     return Boolean(playlist && currentUser?.id && playlist.owner_user_id === currentUser.id)
@@ -124,6 +133,8 @@ export function usePlaylistDetailPage(playlistId: string | undefined) {
     isMembersLoading: membersQuery.isLoading,
     canEditSettings,
     memberNameById,
+    pendingSuggestionTrackIds,
+    inPlaylistTrackIds,
     ...settingsState,
     ...interactionState,
     ...playerState,

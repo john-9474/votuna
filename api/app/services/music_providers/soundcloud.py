@@ -432,3 +432,35 @@ class SoundcloudProvider(MusicProviderClient):
                 json=update_payload,
             )
             self._raise_for_status(update_response)
+
+    async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
+        if not track_ids:
+            return
+        remove_ids = {str(track_id) for track_id in track_ids}
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
+            response = await client.get(
+                f"/playlists/{provider_playlist_id}",
+                headers=self._headers(),
+                params=self._params(),
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+            existing_tracks = payload.get("tracks", []) or []
+            kept_tracks = [
+                track
+                for track in existing_tracks
+                if str(track.get("id")) not in remove_ids
+            ]
+            update_payload = {
+                "playlist": {
+                    "title": payload.get("title") or "Untitled",
+                    "tracks": [{"id": track.get("id")} for track in kept_tracks if track.get("id") is not None],
+                }
+            }
+            update_response = await client.put(
+                f"/playlists/{provider_playlist_id}",
+                headers=self._headers(),
+                params=self._params(),
+                json=update_payload,
+            )
+            self._raise_for_status(update_response)

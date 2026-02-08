@@ -81,6 +81,9 @@ class MusicProviderClient:
     async def add_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         raise NotImplementedError
 
+    async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
+        raise NotImplementedError
+
     async def search_tracks(self, query: str, limit: int = 10) -> Sequence[ProviderTrack]:
         """Search tracks by free-text query."""
         raise NotImplementedError

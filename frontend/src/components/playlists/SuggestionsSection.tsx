@@ -2,7 +2,6 @@ import { RiAddLine, RiCloseLine, RiThumbDownLine, RiThumbUpLine } from '@remixic
 import { Button } from '@tremor/react'
 
 import type { Suggestion, TrackPlayRequest } from '@/lib/types/votuna'
-import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
@@ -32,6 +31,10 @@ const formatAddedDate = (addedAt: string | null | undefined) => {
 
 const reactionButtonBaseClass =
   'inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60'
+const destructiveActionButtonClass =
+  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
+const forceAddButtonClass =
+  'inline-flex h-10 items-center justify-center gap-1 rounded-full border border-emerald-300 bg-emerald-50/70 px-4 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100/70 disabled:cursor-not-allowed disabled:opacity-60'
 
 export default function SuggestionsSection({
   suggestions,
@@ -165,20 +168,21 @@ export default function SuggestionsSection({
                         disabled={isCancelPending}
                         aria-label="Cancel suggestion"
                         onClick={() => onCancelSuggestion(suggestion.id)}
-                        className={`${reactionButtonBaseClass} border-[color:rgb(var(--votuna-ink)/0.16)] text-[color:rgb(var(--votuna-ink)/0.75)] hover:border-[color:rgb(var(--votuna-ink)/0.35)] hover:text-[rgb(var(--votuna-ink))]`}
+                        className={destructiveActionButtonClass}
                       >
                         <RiCloseLine className="h-4 w-4" />
                       </button>
                     ) : null}
                     {suggestion.can_force_add ? (
-                      <PrimaryButton
+                      <button
+                        type="button"
                         onClick={() => onForceAddSuggestion(suggestion.id)}
                         disabled={isForceAddPending}
-                        className="w-28 justify-center"
+                        className={forceAddButtonClass}
                       >
-                        <RiAddLine className="mr-1 h-4 w-4" />
+                        <RiAddLine className="h-4 w-4" />
                         Force add
-                      </PrimaryButton>
+                      </button>
                     ) : null}
                   </div>
                 </div>
