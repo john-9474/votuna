@@ -88,6 +88,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     container_name: votuna_frontend
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
@@ -103,7 +104,7 @@ services:
       - ./frontend/public:/app/public
     networks:
       - votuna_network
-    command: bun run dev
+    command: npm run dev
 
 volumes:
   postgres_data:

@@ -143,6 +143,72 @@ If needed, create `frontend/.env.local`:
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
+## Deploy to Railway
+
+### Architecture
+
+- `postgres`: Railway PostgreSQL service
+- `api`: public FastAPI service (root directory: `/api`, config: `/api/railway.toml`)
+- `frontend`: public Next.js service (root directory: `/frontend`, config: `/frontend/railway.toml`)
+
+### 1. Create services
+
+1. Create a Railway project.
+2. Add `Postgres` from Railway templates.
+3. Add `api` service from this repo with root directory `api`.
+4. Add `frontend` service from this repo with root directory `frontend`.
+
+### 2. Configure API variables
+
+Set these in Railway for the `api` service:
+
+- `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- `AUTH_SECRET_KEY=<strong-random-value>`
+- `AUTH_COOKIE_SECURE=True`
+- `AUTH_COOKIE_SAMESITE=lax` (or `none` for true cross-site deployments)
+- `FRONTEND_URL=https://<frontend-domain>.up.railway.app`
+- `ALLOWED_ORIGINS=["https://<frontend-domain>.up.railway.app"]`
+- `SOUNDCLOUD_CLIENT_ID=<soundcloud-client-id>`
+- `SOUNDCLOUD_CLIENT_SECRET=<soundcloud-client-secret>`
+- `SOUNDCLOUD_REDIRECT_URI=https://<api-domain>.up.railway.app/api/v1/auth/callback/soundcloud`
+- `USER_FILES_DIR=/app/user_files`
+- `RAILWAY_RUN_UID=0`
+
+### 3. Configure frontend variables
+
+Set these in Railway for the `frontend` service:
+
+- `NEXT_PUBLIC_API_URL=https://<api-domain>.up.railway.app`
+
+`NEXT_PUBLIC_API_URL` is required at build time in production image builds.
+
+### 4. Attach persistent volume for avatars
+
+Attach a volume to the `api` service and mount it at:
+
+- `/app/user_files`
+
+This keeps uploaded avatar files across deploys.
+
+### 5. Deploy sequence
+
+1. Deploy `api` and generate its public domain.
+2. Set `NEXT_PUBLIC_API_URL` in `frontend` to the API domain.
+3. Deploy `frontend` and generate its public domain.
+4. Update API `FRONTEND_URL` and `ALLOWED_ORIGINS` with the frontend domain and redeploy `api`.
+5. In SoundCloud developer settings, set callback URL to:
+   - `https://<api-domain>.up.railway.app/api/v1/auth/callback/soundcloud`
+6. Ensure `SOUNDCLOUD_REDIRECT_URI` matches exactly, then redeploy `api`.
+
+### 6. Smoke test checklist
+
+- API health: `GET /health` returns healthy.
+- Frontend loads and can fetch authenticated user state.
+- SoundCloud login redirects back to app and sets auth cookie.
+- Playlist listing/details load.
+- Suggest/add/vote flows work.
+- Upload avatar, redeploy API, verify avatar still exists.
+
 ## Migrations
 
 From `api/`:

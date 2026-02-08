@@ -1,4 +1,10 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const apiUrl = process.env.NEXT_PUBLIC_API_URL
+
+if (!apiUrl && process.env.NODE_ENV === 'production') {
+  throw new Error('NEXT_PUBLIC_API_URL is required in production builds')
+}
+
+export const API_URL = apiUrl ?? 'http://localhost:8000'
 const AUTH_EXPIRED_HEADER = 'X-Votuna-Auth-Expired'
 
 type ApiFetchOptions = RequestInit & {
