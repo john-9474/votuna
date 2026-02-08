@@ -1,4 +1,5 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
+const AUTH_EXPIRED_HEADER = 'X-Votuna-Auth-Expired'
 
 type ApiFetchOptions = RequestInit & {
   authRequired?: boolean
@@ -16,7 +17,8 @@ export async function apiFetch(path: string, options: ApiFetchOptions = {}) {
     ...init,
   })
 
-  if (authRequired && response.status === 401 && typeof window !== 'undefined') {
+  const authExpired = response.headers.get(AUTH_EXPIRED_HEADER) === '1'
+  if (authRequired && response.status === 401 && authExpired && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('votuna:auth-expired'))
   }
 

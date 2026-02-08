@@ -7,6 +7,7 @@ import logging
 import sys
 
 from app.api.v1.router import router as v1_router
+from app.auth.dependencies import AUTH_EXPIRED_HEADER
 from app.config.settings import settings
 from app.db.session import get_db
 
@@ -40,9 +41,13 @@ app = FastAPI(
 
 @app.middleware("http")
 async def clear_auth_cookie_on_unauthorized(request, call_next):
-    """Clear auth cookie on 401s to force re-login when tokens expire."""
+    """Clear auth cookie only when JWT/session auth has actually expired."""
     response = await call_next(request)
-    if response.status_code == status.HTTP_401_UNAUTHORIZED:
+    should_clear_cookie = (
+        response.status_code == status.HTTP_401_UNAUTHORIZED
+        and response.headers.get(AUTH_EXPIRED_HEADER) == "1"
+    )
+    if should_clear_cookie:
         response.delete_cookie(
             settings.AUTH_COOKIE_NAME,
             httponly=True,
@@ -58,6 +63,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "Accept", "Origin"],
+    expose_headers=[AUTH_EXPIRED_HEADER],
 )
 
 

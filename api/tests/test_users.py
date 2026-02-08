@@ -1,11 +1,13 @@
 import io
 
+from app.auth.dependencies import AUTH_EXPIRED_HEADER
 from app.crud.user import user_crud
 
 
 def test_get_me_unauthorized(client):
     response = client.get("/api/v1/users/me")
     assert response.status_code == 401
+    assert response.headers.get(AUTH_EXPIRED_HEADER) == "1"
 
 
 def test_get_me_authorized(auth_client, user):

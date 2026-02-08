@@ -7,6 +7,8 @@ from app.config.settings import settings
 from app.crud.user import user_crud
 from app.db.session import get_db
 
+AUTH_EXPIRED_HEADER = "X-Votuna-Auth-Expired"
+
 
 def _get_token_from_request(request: Request) -> str | None:
     """Extract a bearer token from headers or the auth cookie."""
@@ -25,20 +27,36 @@ def get_current_user(
     """Resolve the authenticated user from the request token."""
     token = _get_token_from_request(request)
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={AUTH_EXPIRED_HEADER: "1"},
+        )
 
     try:
         payload = decode_access_token(token)
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={AUTH_EXPIRED_HEADER: "1"},
+        )
 
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={AUTH_EXPIRED_HEADER: "1"},
+        )
 
     user = user_crud.get(db, int(user_id))
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user",
+            headers={AUTH_EXPIRED_HEADER: "1"},
+        )
     return user
 
 

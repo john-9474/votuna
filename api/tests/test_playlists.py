@@ -1,4 +1,6 @@
+from app.auth.dependencies import AUTH_EXPIRED_HEADER
 from app.crud.user import user_crud
+from app.services.music_providers.base import ProviderAuthError
 
 
 def test_list_provider_playlists(auth_client, provider_stub):
@@ -50,3 +52,13 @@ def test_missing_access_token_returns_400(auth_client, db_session, user):
     user_crud.update(db_session, user, {"access_token": None})
     response = auth_client.get("/api/v1/playlists/providers/soundcloud")
     assert response.status_code == 400
+
+
+def test_provider_auth_401_does_not_set_auth_expired_header(auth_client, provider_stub, monkeypatch):
+    async def _raise_provider_auth(*args, **kwargs):
+        raise ProviderAuthError("SoundCloud authorization expired or invalid")
+
+    monkeypatch.setattr(provider_stub, "list_playlists", _raise_provider_auth)
+    response = auth_client.get("/api/v1/playlists/providers/soundcloud")
+    assert response.status_code == 401
+    assert response.headers.get(AUTH_EXPIRED_HEADER) is None
