@@ -37,7 +37,6 @@ router = APIRouter()
 
 MAX_TRACKS_PER_ACTION = 500
 ADD_CHUNK_SIZE = 100
-PREVIEW_SAMPLE_SIZE = 10
 FACETS_LIMIT = 100
 
 
@@ -480,12 +479,8 @@ async def preview_management_transfer(
         to_add_count=len(to_add_tracks),
         duplicate_count=len(duplicate_tracks),
         max_tracks_per_action=MAX_TRACKS_PER_ACTION,
-        matched_sample=[
-            _provider_track_to_out(track) for track in matched_tracks[:PREVIEW_SAMPLE_SIZE]
-        ],
-        duplicate_sample=[
-            _provider_track_to_out(track) for track in duplicate_tracks[:PREVIEW_SAMPLE_SIZE]
-        ],
+        matched_sample=[_provider_track_to_out(track) for track in matched_tracks],
+        duplicate_sample=[_provider_track_to_out(track) for track in duplicate_tracks],
     )
 
 

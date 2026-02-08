@@ -176,23 +176,15 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
 
                 {!playlists.destination.isCreatingNew ? (
                   <div>
-                    <select
-                      value={playlists.otherPlaylist.selectedKey}
-                      onChange={(event) => playlists.otherPlaylist.setSelectedKey(event.target.value)}
-                      className="votuna-select w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm text-[rgb(var(--votuna-ink))]"
-                    >
-                      <option value="">Select a destination playlist</option>
-                      {playlists.otherPlaylist.options.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {!playlists.otherPlaylist.hasOptions ? (
-                      <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
-                        No eligible playlists found yet. Create or sync another playlist first.
-                      </p>
-                    ) : null}
+                    <p className="mb-2 text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
+                      Pick the destination playlist.
+                    </p>
+                    <PlaylistGridPicker
+                      options={playlists.otherPlaylist.options}
+                      selectedKey={playlists.otherPlaylist.selectedKey}
+                      onSelect={playlists.otherPlaylist.setSelectedKey}
+                      emptyMessage="No eligible playlists found yet. Create or sync another playlist first."
+                    />
                   </div>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2">
