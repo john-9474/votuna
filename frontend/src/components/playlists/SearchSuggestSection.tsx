@@ -1,6 +1,7 @@
-import { Button, TextInput } from '@tremor/react'
+import { Button } from '@tremor/react'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
+import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import SurfaceCard from '@/components/ui/SurfaceCard'
@@ -55,11 +56,12 @@ export default function SearchSuggestSection({
           onSearchTracks()
         }}
       >
-        <TextInput
+        <ClearableTextInput
           value={searchQuery}
           onValueChange={onSearchQueryChange}
           placeholder="Search SoundCloud tracks"
-          className="flex-1"
+          containerClassName="flex-1"
+          clearAriaLabel="Clear track search"
         />
         <PrimaryButton
           type="submit"
@@ -145,11 +147,12 @@ export default function SearchSuggestSection({
             onSuggestFromLink()
           }}
         >
-          <TextInput
+          <ClearableTextInput
             value={linkSuggestionUrl}
             onValueChange={onLinkSuggestionUrlChange}
             placeholder="https://soundcloud.com/artist/track-name"
-            className="flex-1"
+            containerClassName="flex-1"
+            clearAriaLabel="Clear track link"
           />
           <PrimaryButton
             type="submit"

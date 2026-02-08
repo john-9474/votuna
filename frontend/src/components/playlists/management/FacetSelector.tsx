@@ -1,4 +1,5 @@
 import { hasValue } from '@/lib/hooks/playlistDetail/management/shared'
+import ClearableInput from '@/components/ui/ClearableInput'
 
 type FacetSelectorProps = {
   label: string
@@ -34,9 +35,10 @@ export default function FacetSelector({
       </p>
 
       <div className="flex gap-2">
-        <input
+        <ClearableInput
           value={customInput}
-          onChange={(event) => onCustomInputChange(event.target.value)}
+          onValueChange={onCustomInputChange}
+          containerClassName="flex-1"
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
               event.preventDefault()
@@ -45,6 +47,7 @@ export default function FacetSelector({
           }}
           className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.92)] px-4 py-2 text-sm"
           placeholder={customPlaceholder}
+          clearAriaLabel={`Clear ${label.toLowerCase()} input`}
         />
         <button
           type="button"
@@ -110,4 +113,3 @@ export default function FacetSelector({
     </div>
   )
 }
-

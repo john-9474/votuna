@@ -1,11 +1,12 @@
 'use client'
 
-import { Button, Card, TextInput } from '@tremor/react'
+import { Button, Card } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import { apiJson, ApiError } from '../lib/api'
 
 type ProviderPlaylist = {
@@ -401,11 +402,13 @@ export default function Home() {
               </p>
             </div>
             <div className="flex w-full max-w-md flex-wrap items-center gap-3">
-              <TextInput
+              <ClearableTextInput
                 value={newPlaylistTitle}
                 onValueChange={setNewPlaylistTitle}
                 placeholder="Playlist title"
-                className="flex-1 bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
+                containerClassName="flex-1"
+                className="bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
+                clearAriaLabel="Clear playlist title"
               />
               <div className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                 <button

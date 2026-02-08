@@ -1,11 +1,12 @@
 'use client'
 
-import { Button, Dialog, DialogPanel, TextInput } from '@tremor/react'
+import { Button, Dialog, DialogPanel } from '@tremor/react'
 import { useState } from 'react'
 
 import { API_URL } from '@/lib/api'
 import type { usePlaylistInvites } from '@/lib/hooks/playlistDetail/usePlaylistInvites'
 import type { PlaylistMember } from '@/lib/types/votuna'
+import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import UserAvatar from '@/components/ui/UserAvatar'
@@ -201,11 +202,13 @@ export default function CollaboratorsSection({
               invites.search.run()
             }}
           >
-            <TextInput
+            <ClearableTextInput
               value={invites.search.query}
               onValueChange={invites.search.setQuery}
               placeholder="Search username"
-              className="flex-1 bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
+              containerClassName="flex-1"
+              className="bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
+              clearAriaLabel="Clear user search"
             />
             <Button
               type="submit"

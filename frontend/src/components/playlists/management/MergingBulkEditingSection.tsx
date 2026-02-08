@@ -1,6 +1,7 @@
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
+import ClearableInput from '@/components/ui/ClearableInput'
 
 import FacetSelector from './FacetSelector'
 import PlaylistGridPicker from './PlaylistGridPicker'
@@ -121,11 +122,13 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         playlists.otherPlaylist.search.run()
                       }}
                     >
-                      <input
+                      <ClearableInput
                         value={playlists.otherPlaylist.search.input}
-                        onChange={(event) => playlists.otherPlaylist.search.setInput(event.target.value)}
-                        className="flex-1 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        onValueChange={playlists.otherPlaylist.search.setInput}
+                        containerClassName="flex-1"
+                        className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                         placeholder="Search playlists or paste a SoundCloud playlist link"
+                        clearAriaLabel="Clear playlist search"
                       />
                       <button
                         type="submit"
@@ -203,26 +206,24 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
                         New playlist name
                       </p>
-                      <input
+                      <ClearableInput
                         value={playlists.destination.createForm.title}
-                        onChange={(event) =>
-                          playlists.destination.createForm.setTitle(event.target.value)
-                        }
+                        onValueChange={playlists.destination.createForm.setTitle}
                         className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                         placeholder="Playlist name"
+                        clearAriaLabel="Clear playlist name"
                       />
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
                         Description
                       </p>
-                      <input
+                      <ClearableInput
                         value={playlists.destination.createForm.description}
-                        onChange={(event) =>
-                          playlists.destination.createForm.setDescription(event.target.value)
-                        }
+                        onValueChange={playlists.destination.createForm.setDescription}
                         className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                         placeholder="Optional description"
+                        clearAriaLabel="Clear playlist description"
                       />
                     </div>
                     <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)] sm:col-span-2">
@@ -304,11 +305,12 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         </p>
                       </div>
                       <div className="w-full max-w-sm">
-                        <input
+                        <ClearableInput
                           value={sourcePicker.search}
-                          onChange={(event) => sourcePicker.setSearch(event.target.value)}
+                          onValueChange={sourcePicker.setSearch}
                           className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                           placeholder="Search songs in source playlist"
+                          clearAriaLabel="Clear source song search"
                         />
                       </div>
                     </div>
