@@ -112,14 +112,11 @@ def test_callback_auto_joins_invite_and_redirects_to_playlist(
             "accepted_at": None,
         },
     )
-    response = client.get(
-        "/api/v1/auth/callback/soundcloud",
-        cookies={
-            "votuna_pending_invite_token": invite.token,
-            "votuna_pending_next": f"/playlists/{votuna_playlist.id}",
-        },
-        follow_redirects=False,
-    )
+    client.cookies.set("votuna_pending_invite_token", invite.token)
+    client.cookies.set("votuna_pending_next", f"/playlists/{votuna_playlist.id}")
+    response = client.get("/api/v1/auth/callback/soundcloud", follow_redirects=False)
+    client.cookies.pop("votuna_pending_invite_token", None)
+    client.cookies.pop("votuna_pending_next", None)
     assert response.status_code in {302, 307}
     assert response.headers["location"].endswith(f"/playlists/{votuna_playlist.id}")
 
