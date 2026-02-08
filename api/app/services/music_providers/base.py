@@ -59,6 +59,14 @@ class MusicProviderClient:
     async def get_playlist(self, provider_playlist_id: str) -> ProviderPlaylist:
         raise NotImplementedError
 
+    async def search_playlists(self, query: str, limit: int = 10) -> Sequence[ProviderPlaylist]:
+        """Search playlists by free-text query."""
+        raise NotImplementedError
+
+    async def resolve_playlist_url(self, url: str) -> ProviderPlaylist:
+        """Resolve a provider playlist URL to canonical playlist metadata."""
+        raise NotImplementedError
+
     async def create_playlist(
         self,
         title: str,

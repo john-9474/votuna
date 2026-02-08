@@ -58,6 +58,28 @@ class SoundcloudProvider(MusicProviderClient):
             url=payload.get("permalink_url"),
         )
 
+    def _to_provider_playlist(self, payload: Any) -> ProviderPlaylist | None:
+        if not isinstance(payload, dict):
+            return None
+        playlist_id = payload.get("id")
+        if playlist_id is None:
+            return None
+        user_payload = payload.get("user")
+        user = user_payload if isinstance(user_payload, dict) else {}
+        sharing = payload.get("sharing")
+        is_public = None
+        if isinstance(sharing, str):
+            is_public = sharing.lower() == "public"
+        return ProviderPlaylist(
+            provider=self.provider,
+            provider_playlist_id=str(playlist_id),
+            title=payload.get("title") or "Untitled",
+            description=payload.get("description"),
+            image_url=payload.get("artwork_url") or user.get("avatar_url"),
+            track_count=payload.get("track_count"),
+            is_public=is_public,
+        )
+
     def _to_provider_user(self, payload: Any) -> ProviderUser | None:
         if not isinstance(payload, dict):
             return None
@@ -140,23 +162,11 @@ class SoundcloudProvider(MusicProviderClient):
             )
             self._raise_for_status(response)
             data = response.json()
-        playlists = []
+        playlists: list[ProviderPlaylist] = []
         for item in data or []:
-            sharing = item.get("sharing")
-            is_public = None
-            if isinstance(sharing, str):
-                is_public = sharing.lower() == "public"
-            playlists.append(
-                ProviderPlaylist(
-                    provider=self.provider,
-                    provider_playlist_id=str(item.get("id")),
-                    title=item.get("title") or "Untitled",
-                    description=item.get("description"),
-                    image_url=item.get("artwork_url") or item.get("user", {}).get("avatar_url"),
-                    track_count=item.get("track_count"),
-                    is_public=is_public,
-                )
-            )
+            mapped = self._to_provider_playlist(item)
+            if mapped:
+                playlists.append(mapped)
         return playlists
 
     async def get_playlist(self, provider_playlist_id: str) -> ProviderPlaylist:
@@ -168,17 +178,61 @@ class SoundcloudProvider(MusicProviderClient):
             )
             self._raise_for_status(response)
             item = response.json()
-        return ProviderPlaylist(
-            provider=self.provider,
-            provider_playlist_id=str(item.get("id")),
-            title=item.get("title") or "Untitled",
-            description=item.get("description"),
-            image_url=item.get("artwork_url") or item.get("user", {}).get("avatar_url"),
-            track_count=item.get("track_count"),
-            is_public=(item.get("sharing") or "").lower() == "public"
-            if isinstance(item.get("sharing"), str)
-            else None,
-        )
+        mapped = self._to_provider_playlist(item)
+        if not mapped:
+            raise ProviderAPIError("Unable to load playlist", status_code=404)
+        return mapped
+
+    async def search_playlists(self, query: str, limit: int = 10) -> Sequence[ProviderPlaylist]:
+        search_query = query.strip()
+        if not search_query:
+            return []
+        safe_limit = max(1, min(limit, 25))
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+            response = await client.get(
+                "/playlists",
+                headers=self._headers(),
+                params={
+                    **self._params(),
+                    "q": search_query,
+                    "limit": safe_limit,
+                },
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+        if not isinstance(payload, list):
+            return []
+        results: list[ProviderPlaylist] = []
+        for item in payload:
+            mapped = self._to_provider_playlist(item)
+            if mapped:
+                results.append(mapped)
+        return results
+
+    async def resolve_playlist_url(self, url: str) -> ProviderPlaylist:
+        playlist_url = url.strip()
+        if not playlist_url:
+            raise ProviderAPIError("Playlist URL is required", status_code=400)
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+            response = await client.get(
+                "/resolve",
+                headers=self._headers(),
+                params={
+                    **self._params(),
+                    "url": playlist_url,
+                },
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+        if not isinstance(payload, dict):
+            raise ProviderAPIError("Unable to resolve playlist URL", status_code=404)
+        kind = (payload.get("kind") or "").lower()
+        if kind and kind not in {"playlist", "system-playlist"}:
+            raise ProviderAPIError("Resolved URL is not a playlist", status_code=400)
+        mapped = self._to_provider_playlist(payload)
+        if not mapped:
+            raise ProviderAPIError("Unable to resolve playlist URL", status_code=404)
+        return mapped
 
     async def create_playlist(
         self,
@@ -202,16 +256,17 @@ class SoundcloudProvider(MusicProviderClient):
             )
             self._raise_for_status(response)
             item = response.json()
+        mapped = self._to_provider_playlist(item)
+        if not mapped:
+            raise ProviderAPIError("Unable to create playlist", status_code=502)
         return ProviderPlaylist(
-            provider=self.provider,
-            provider_playlist_id=str(item.get("id")),
-            title=item.get("title") or title,
-            description=item.get("description") or description,
-            image_url=item.get("artwork_url") or item.get("user", {}).get("avatar_url"),
-            track_count=item.get("track_count"),
-            is_public=(item.get("sharing") or "").lower() == "public"
-            if isinstance(item.get("sharing"), str)
-            else None,
+            provider=mapped.provider,
+            provider_playlist_id=mapped.provider_playlist_id,
+            title=mapped.title or title,
+            description=mapped.description if mapped.description is not None else description,
+            image_url=mapped.image_url,
+            track_count=mapped.track_count,
+            is_public=mapped.is_public,
         )
 
     async def list_tracks(self, provider_playlist_id: str) -> Sequence[ProviderTrack]:

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { apiJson } from '@/lib/api'
 import { queryKeys } from '@/lib/constants/queryKeys'
@@ -7,18 +7,39 @@ import type { ManagementPlaylistRef, VotunaPlaylist } from '@/lib/types/votuna'
 
 import type { ManagementCounterpartyOption, ProviderPlaylist } from './shared'
 
+export type CounterpartySourceMode = 'my_playlists' | 'search_playlists'
+
 type UseManagementCounterpartyArgs = {
   playlist: VotunaPlaylist | null
   canManage: boolean
   currentUserId: number | undefined
 }
 
+const SEARCH_LIMIT = 12
+
+const normalizePlaylistUrl = (value: string) => {
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^soundcloud\.com\//i.test(trimmed)) return `https://${trimmed}`
+  return ''
+}
+
+const isDefined = <T>(value: T | null | undefined): value is T => value != null
+
 export function useManagementCounterparty({
   playlist,
   canManage,
   currentUserId,
 }: UseManagementCounterpartyArgs) {
+  const [sourceMode, setSourceMode] = useState<CounterpartySourceMode>('my_playlists')
   const [selectedCounterpartyKey, setSelectedCounterpartyKey] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
+  const [isSearchPending, setIsSearchPending] = useState(false)
+  const [searchCounterpartyOptions, setSearchCounterpartyOptions] = useState<
+    ManagementCounterpartyOption[]
+  >([])
 
   const providerPlaylistsQuery = useQuery({
     queryKey: queryKeys.providerPlaylistsByProvider(playlist?.provider || ''),
@@ -37,29 +58,37 @@ export function useManagementCounterparty({
     staleTime: 30_000,
   })
 
-  const counterpartyOptions = useMemo<ManagementCounterpartyOption[]>(() => {
+  const toProviderCounterpartyOption = useCallback((providerPlaylist: ProviderPlaylist) => {
+    if (!playlist) return null
+    if (
+      providerPlaylist.provider !== playlist.provider ||
+      providerPlaylist.provider_playlist_id === playlist.provider_playlist_id
+    ) {
+      return null
+    }
+    return {
+      key: `provider:${providerPlaylist.provider}:${providerPlaylist.provider_playlist_id}`,
+      label: providerPlaylist.title,
+      sourceTypeLabel: 'Music provider playlist',
+      imageUrl: providerPlaylist.image_url ?? null,
+      ref: {
+        kind: 'provider' as const,
+        provider: providerPlaylist.provider,
+        provider_playlist_id: providerPlaylist.provider_playlist_id,
+      },
+    }
+  }, [playlist])
+
+  const myCounterpartyOptions = useMemo<ManagementCounterpartyOption[]>(() => {
     if (!playlist) return []
 
     const options: ManagementCounterpartyOption[] = []
 
     for (const providerPlaylist of providerPlaylistsQuery.data ?? []) {
-      if (
-        providerPlaylist.provider !== playlist.provider ||
-        providerPlaylist.provider_playlist_id === playlist.provider_playlist_id
-      ) {
-        continue
+      const option = toProviderCounterpartyOption(providerPlaylist)
+      if (option) {
+        options.push(option)
       }
-      options.push({
-        key: `provider:${providerPlaylist.provider}:${providerPlaylist.provider_playlist_id}`,
-        label: providerPlaylist.title,
-        sourceTypeLabel: 'Music provider playlist',
-        imageUrl: providerPlaylist.image_url ?? null,
-        ref: {
-          kind: 'provider',
-          provider: providerPlaylist.provider,
-          provider_playlist_id: providerPlaylist.provider_playlist_id,
-        },
-      })
     }
 
     for (const votunaPlaylist of votunaPlaylistsQuery.data ?? []) {
@@ -88,23 +117,101 @@ export function useManagementCounterparty({
     providerPlaylistsQuery.data,
     votunaPlaylistsQuery.data,
     currentUserId,
+    toProviderCounterpartyOption,
   ])
+
+  const allCounterpartyOptions = useMemo<ManagementCounterpartyOption[]>(() => {
+    const deduped = new Map<string, ManagementCounterpartyOption>()
+    for (const option of myCounterpartyOptions) {
+      deduped.set(option.key, option)
+    }
+    for (const option of searchCounterpartyOptions) {
+      if (!deduped.has(option.key)) {
+        deduped.set(option.key, option)
+      }
+    }
+    return Array.from(deduped.values()).sort((left, right) => left.label.localeCompare(right.label))
+  }, [myCounterpartyOptions, searchCounterpartyOptions])
+
+  const visibleCounterpartyOptions = useMemo(
+    () => (sourceMode === 'search_playlists' ? searchCounterpartyOptions : myCounterpartyOptions),
+    [sourceMode, searchCounterpartyOptions, myCounterpartyOptions],
+  )
 
   useEffect(() => {
     if (!selectedCounterpartyKey) return
-    const exists = counterpartyOptions.some((option) => option.key === selectedCounterpartyKey)
+    const exists = allCounterpartyOptions.some((option) => option.key === selectedCounterpartyKey)
     if (!exists) {
       setSelectedCounterpartyKey('')
     }
-  }, [selectedCounterpartyKey, counterpartyOptions])
+  }, [selectedCounterpartyKey, allCounterpartyOptions])
 
   const selectedCounterpartyRef = useMemo<ManagementPlaylistRef | null>(
-    () => counterpartyOptions.find((option) => option.key === selectedCounterpartyKey)?.ref ?? null,
-    [counterpartyOptions, selectedCounterpartyKey],
+    () => allCounterpartyOptions.find((option) => option.key === selectedCounterpartyKey)?.ref ?? null,
+    [allCounterpartyOptions, selectedCounterpartyKey],
   )
 
+  const discoverCounterpartyPlaylists = async () => {
+    if (!playlist?.provider || !canManage) return
+    const query = searchInput.trim()
+    if (!query) return
+    setSearchStatus('')
+    setIsSearchPending(true)
+
+    try {
+      const normalizedUrl = normalizePlaylistUrl(query)
+      if (normalizedUrl) {
+        const resolved = await apiJson<ProviderPlaylist>(
+          `/api/v1/playlists/providers/${playlist.provider}/resolve?url=${encodeURIComponent(
+            normalizedUrl,
+          )}`,
+          { authRequired: true },
+        )
+        const option = toProviderCounterpartyOption(resolved)
+        if (!option) {
+          setSearchCounterpartyOptions([])
+          setSearchStatus('This playlist cannot be used as the source for this transfer.')
+          return
+        }
+        setSearchCounterpartyOptions([option])
+        setSelectedCounterpartyKey(option.key)
+        setSearchStatus('Playlist loaded from link.')
+        return
+      }
+
+      const results = await apiJson<ProviderPlaylist[]>(
+        `/api/v1/playlists/providers/${playlist.provider}/search?q=${encodeURIComponent(query)}&limit=${SEARCH_LIMIT}`,
+        { authRequired: true },
+      )
+      const options = results
+        .map((providerPlaylist) => toProviderCounterpartyOption(providerPlaylist))
+        .filter(isDefined)
+        .sort((left, right) => left.label.localeCompare(right.label))
+      setSearchCounterpartyOptions(options)
+      if (options.length === 0) {
+        setSearchStatus('No playlists found for that search.')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to search playlists'
+      setSearchStatus(message)
+      setSearchCounterpartyOptions([])
+    } finally {
+      setIsSearchPending(false)
+    }
+  }
+
   return {
-    counterpartyOptions,
+    sourceMode,
+    setSourceMode,
+    searchInput,
+    setSearchInput,
+    searchStatus,
+    isSearchPending,
+    discoverCounterpartyPlaylists,
+    myCounterpartyOptions,
+    searchCounterpartyOptions,
+    allCounterpartyOptions,
+    visibleCounterpartyOptions,
     selectedCounterpartyKey,
     setSelectedCounterpartyKey,
     selectedCounterpartyRef,

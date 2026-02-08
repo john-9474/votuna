@@ -65,6 +65,8 @@ export type PlaylistManagementState = {
     sourceLabel: string
     destinationLabel: string
     otherPlaylist: {
+      sourceMode: 'my_playlists' | 'search_playlists'
+      setSourceMode: (value: 'my_playlists' | 'search_playlists') => void
       options: Array<{
         key: string
         label: string
@@ -74,6 +76,15 @@ export type PlaylistManagementState = {
       selectedKey: string
       setSelectedKey: (value: string) => void
       hasOptions: boolean
+      hasMyOptions: boolean
+      search: {
+        input: string
+        setInput: (value: string) => void
+        run: () => void
+        isPending: boolean
+        status: string
+        hasResults: boolean
+      }
     }
     destination: {
       mode: 'existing' | 'create'
@@ -181,11 +192,35 @@ export function usePlaylistManagement({
     currentUserId,
   })
   const {
-    counterpartyOptions,
+    sourceMode: counterpartySourceMode,
+    setSourceMode: setCounterpartySourceMode,
+    searchInput: counterpartySearchInput,
+    setSearchInput: setCounterpartySearchInput,
+    searchStatus: counterpartySearchStatus,
+    isSearchPending: isCounterpartySearchPending,
+    discoverCounterpartyPlaylists,
+    myCounterpartyOptions,
+    searchCounterpartyOptions,
+    allCounterpartyOptions,
+    visibleCounterpartyOptions,
     selectedCounterpartyKey,
     setSelectedCounterpartyKey,
     selectedCounterpartyRef,
   } = counterpartyState
+
+  const isImportAction = action === 'add_to_this_playlist'
+  const effectiveCounterpartyOptions = isImportAction
+    ? visibleCounterpartyOptions
+    : myCounterpartyOptions
+  const selectedCounterpartyInMyOptions = useMemo(
+    () => myCounterpartyOptions.some((option) => option.key === selectedCounterpartyKey),
+    [myCounterpartyOptions, selectedCounterpartyKey],
+  )
+  const selectedCounterpartyRefForAction = useMemo(() => {
+    if (!selectedCounterpartyRef) return null
+    if (action === 'add_to_this_playlist') return selectedCounterpartyRef
+    return selectedCounterpartyInMyOptions ? selectedCounterpartyRef : null
+  }, [action, selectedCounterpartyRef, selectedCounterpartyInMyOptions])
 
   const isCreatingDestination = action === 'copy_to_another_playlist' && destinationMode === 'create'
 
@@ -194,16 +229,34 @@ export function usePlaylistManagement({
     setSelectedCounterpartyKey('')
   }, [isCreatingDestination, setSelectedCounterpartyKey])
 
+  useEffect(() => {
+    if (isImportAction) return
+    if (counterpartySourceMode === 'my_playlists') return
+    setCounterpartySourceMode('my_playlists')
+  }, [isImportAction, counterpartySourceMode, setCounterpartySourceMode])
+
+  useEffect(() => {
+    if (isImportAction) return
+    if (!selectedCounterpartyKey) return
+    if (selectedCounterpartyInMyOptions) return
+    setSelectedCounterpartyKey('')
+  }, [
+    isImportAction,
+    selectedCounterpartyKey,
+    selectedCounterpartyInMyOptions,
+    setSelectedCounterpartyKey,
+  ])
+
   const sourceRefForPicker = useMemo<ManagementPlaylistRef | null>(() => {
     if (!playlist) return null
     if (action === 'add_to_this_playlist') {
-      return selectedCounterpartyRef
+      return selectedCounterpartyRefForAction
     }
     return {
       kind: 'votuna',
       votuna_playlist_id: playlist.id,
     }
-  }, [playlist, action, selectedCounterpartyRef])
+  }, [playlist, action, selectedCounterpartyRefForAction])
 
   const sourceTrackState = useManagementSourceTracks({
     playlistId,
@@ -240,7 +293,7 @@ export function usePlaylistManagement({
     queryClient,
     direction,
     exportTargetMode: destinationMode,
-    selectedCounterpartyRef,
+    selectedCounterpartyRef: selectedCounterpartyRefForAction,
     destinationCreateTitle,
     destinationCreateDescription,
     destinationCreateIsPublic,
@@ -249,8 +302,11 @@ export function usePlaylistManagement({
   })
 
   const selectedCounterpartyOption = useMemo(
-    () => counterpartyOptions.find((option) => option.key === selectedCounterpartyKey) ?? null,
-    [counterpartyOptions, selectedCounterpartyKey],
+    () =>
+      selectedCounterpartyRefForAction
+        ? allCounterpartyOptions.find((option) => option.key === selectedCounterpartyKey) ?? null
+        : null,
+    [allCounterpartyOptions, selectedCounterpartyKey, selectedCounterpartyRefForAction],
   )
 
   const thisPlaylistLabel = playlist?.title || 'This playlist'
@@ -268,10 +324,10 @@ export function usePlaylistManagement({
 
   const canProceedFromAction = true
   const canProceedFromPlaylists = action === 'add_to_this_playlist'
-    ? Boolean(selectedCounterpartyKey)
+    ? Boolean(selectedCounterpartyRefForAction)
     : isCreatingDestination
       ? Boolean(destinationCreateTitle.trim())
-      : Boolean(selectedCounterpartyKey)
+      : Boolean(selectedCounterpartyRefForAction)
 
   const canProceedFromSongScope =
     songScope === 'all'
@@ -285,6 +341,9 @@ export function usePlaylistManagement({
   const reviewIdleMessage = useMemo(() => {
     if (!canProceedFromPlaylists) {
       if (action === 'add_to_this_playlist') {
+        if (counterpartySourceMode === 'search_playlists') {
+          return 'Search or paste a playlist link, then choose a source playlist.'
+        }
         return 'Choose the playlist you want to copy songs from.'
       }
       if (isCreatingDestination) {
@@ -311,6 +370,7 @@ export function usePlaylistManagement({
   }, [
     canProceedFromPlaylists,
     action,
+    counterpartySourceMode,
     isCreatingDestination,
     canProceedFromSongScope,
     songScope,
@@ -321,6 +381,7 @@ export function usePlaylistManagement({
   const applyQuickAction = () => {
     setAction('add_to_this_playlist')
     setDestinationMode('existing')
+    setCounterpartySourceMode('my_playlists')
     setSongScope('all')
     setSelectedGenres([])
     setSelectedArtists([])
@@ -359,6 +420,8 @@ export function usePlaylistManagement({
         setAction(value)
         if (value === 'add_to_this_playlist') {
           setDestinationMode('existing')
+        } else {
+          setCounterpartySourceMode('my_playlists')
         }
       },
       applyQuickAction,
@@ -368,7 +431,9 @@ export function usePlaylistManagement({
       sourceLabel,
       destinationLabel,
       otherPlaylist: {
-        options: counterpartyOptions.map((option) => ({
+        sourceMode: counterpartySourceMode,
+        setSourceMode: setCounterpartySourceMode,
+        options: effectiveCounterpartyOptions.map((option) => ({
           key: option.key,
           label: option.label,
           sourceTypeLabel: option.sourceTypeLabel,
@@ -376,7 +441,16 @@ export function usePlaylistManagement({
         })),
         selectedKey: selectedCounterpartyKey,
         setSelectedKey: setSelectedCounterpartyKey,
-        hasOptions: counterpartyOptions.length > 0,
+        hasOptions: effectiveCounterpartyOptions.length > 0,
+        hasMyOptions: myCounterpartyOptions.length > 0,
+        search: {
+          input: counterpartySearchInput,
+          setInput: setCounterpartySearchInput,
+          run: discoverCounterpartyPlaylists,
+          isPending: isCounterpartySearchPending,
+          status: counterpartySearchStatus,
+          hasResults: searchCounterpartyOptions.length > 0,
+        },
       },
       destination: {
         mode: destinationMode,

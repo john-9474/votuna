@@ -77,14 +77,74 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
             </p>
 
             {action.value === 'add_to_this_playlist' ? (
-              <div className="mt-3">
-                <p className="mb-2 text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
+              <div className="mt-3 space-y-4">
+                <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
                   Pick the playlist to copy songs from.
                 </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => playlists.otherPlaylist.setSourceMode('my_playlists')}
+                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                      playlists.otherPlaylist.sourceMode === 'my_playlists'
+                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
+                    }`}
+                  >
+                    My playlists
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => playlists.otherPlaylist.setSourceMode('search_playlists')}
+                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
+                      playlists.otherPlaylist.sourceMode === 'search_playlists'
+                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
+                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
+                    }`}
+                  >
+                    Search playlists
+                  </button>
+                </div>
+
+                {playlists.otherPlaylist.sourceMode === 'search_playlists' ? (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        value={playlists.otherPlaylist.search.input}
+                        onChange={(event) => playlists.otherPlaylist.search.setInput(event.target.value)}
+                        className="flex-1 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        placeholder="Search playlists or paste a SoundCloud playlist link"
+                      />
+                      <button
+                        type="button"
+                        onClick={playlists.otherPlaylist.search.run}
+                        disabled={
+                          playlists.otherPlaylist.search.isPending ||
+                          !playlists.otherPlaylist.search.input.trim()
+                        }
+                        className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-4 py-2 text-xs font-semibold disabled:opacity-60"
+                      >
+                        {playlists.otherPlaylist.search.isPending ? 'Searching...' : 'Search'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+                      Enter playlist text to search, or paste a SoundCloud playlist URL.
+                    </p>
+                    {playlists.otherPlaylist.search.status ? (
+                      <p className="text-xs text-rose-500">{playlists.otherPlaylist.search.status}</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <PlaylistGridPicker
                   options={playlists.otherPlaylist.options}
                   selectedKey={playlists.otherPlaylist.selectedKey}
                   onSelect={playlists.otherPlaylist.setSelectedKey}
+                  emptyMessage={
+                    playlists.otherPlaylist.sourceMode === 'search_playlists'
+                      ? 'Search playlists above to choose a source playlist.'
+                      : 'No eligible playlists found yet. Create or sync another playlist first.'
+                  }
                 />
               </div>
             ) : (

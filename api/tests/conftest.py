@@ -92,6 +92,32 @@ class DummyProvider:
         url="https://soundcloud.com/test/resolved-track",
     )
     track_exists_value = False
+    search_playlists_results = [
+        ProviderPlaylist(
+            provider="soundcloud",
+            provider_playlist_id="search-1",
+            title="Search Playlist One",
+            description="Search result",
+            track_count=5,
+            is_public=True,
+        ),
+        ProviderPlaylist(
+            provider="soundcloud",
+            provider_playlist_id="search-2",
+            title="Search Playlist Two",
+            description="Search result",
+            track_count=7,
+            is_public=True,
+        ),
+    ]
+    resolved_playlist = ProviderPlaylist(
+        provider="soundcloud",
+        provider_playlist_id="resolved-playlist-1",
+        title="Resolved Playlist",
+        description="Resolved from URL",
+        track_count=3,
+        is_public=True,
+    )
     users_by_provider_id = {
         "provider-user-1": ProviderUser(
             provider_user_id="provider-user-1",
@@ -157,6 +183,18 @@ class DummyProvider:
         if not query.strip():
             return []
         return self.search_tracks_results[:limit]
+
+    async def search_playlists(self, query: str, limit: int = 10):
+        if not query.strip():
+            return []
+        return self.search_playlists_results[:limit]
+
+    async def resolve_playlist_url(self, url: str):
+        if "not-a-playlist" in url:
+            raise ProviderAPIError("Resolved URL is not a playlist", status_code=400)
+        if "missing-playlist" in url:
+            raise ProviderAPIError("Unable to resolve playlist URL", status_code=404)
+        return self.resolved_playlist
 
     async def resolve_track_url(self, url: str):
         if "not-a-track" in url:
@@ -429,6 +467,32 @@ def provider_stub(monkeypatch):
         url="https://soundcloud.com/test/resolved-track",
     )
     DummyProvider.track_exists_value = False
+    DummyProvider.search_playlists_results = [
+        ProviderPlaylist(
+            provider="soundcloud",
+            provider_playlist_id="search-1",
+            title="Search Playlist One",
+            description="Search result",
+            track_count=5,
+            is_public=True,
+        ),
+        ProviderPlaylist(
+            provider="soundcloud",
+            provider_playlist_id="search-2",
+            title="Search Playlist Two",
+            description="Search result",
+            track_count=7,
+            is_public=True,
+        ),
+    ]
+    DummyProvider.resolved_playlist = ProviderPlaylist(
+        provider="soundcloud",
+        provider_playlist_id="resolved-playlist-1",
+        title="Resolved Playlist",
+        description="Resolved from URL",
+        track_count=3,
+        is_public=True,
+    )
     DummyProvider.users_by_provider_id = {
         "provider-user-1": ProviderUser(
             provider_user_id="provider-user-1",

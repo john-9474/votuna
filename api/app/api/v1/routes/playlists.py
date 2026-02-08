@@ -1,5 +1,5 @@
 """Provider playlist routes"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.auth.dependencies import get_current_user
 from app.models.user import User
@@ -21,6 +21,18 @@ def _get_provider_client(provider: str, user: User):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+def _to_provider_playlist_out(playlist) -> ProviderPlaylistOut:
+    return ProviderPlaylistOut(
+        provider=playlist.provider,
+        provider_playlist_id=playlist.provider_playlist_id,
+        title=playlist.title,
+        description=playlist.description,
+        image_url=playlist.image_url,
+        track_count=playlist.track_count,
+        is_public=playlist.is_public,
+    )
+
+
 @router.get("/providers/{provider}", response_model=list[ProviderPlaylistOut])
 async def list_provider_playlists(
     provider: MusicProvider,
@@ -34,18 +46,43 @@ async def list_provider_playlists(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except ProviderAPIError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return [
-        ProviderPlaylistOut(
-            provider=playlist.provider,
-            provider_playlist_id=playlist.provider_playlist_id,
-            title=playlist.title,
-            description=playlist.description,
-            image_url=playlist.image_url,
-            track_count=playlist.track_count,
-            is_public=playlist.is_public,
-        )
-        for playlist in playlists
-    ]
+    return [_to_provider_playlist_out(playlist) for playlist in playlists]
+
+
+@router.get("/providers/{provider}/search", response_model=list[ProviderPlaylistOut])
+async def search_provider_playlists(
+    provider: MusicProvider,
+    q: str = Query(..., min_length=1),
+    limit: int = Query(12, ge=1, le=25),
+    current_user: User = Depends(get_current_user),
+):
+    """Search provider playlists by text."""
+    client = _get_provider_client(provider, current_user)
+    try:
+        playlists = await client.search_playlists(q, limit=limit)
+    except ProviderAuthError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    return [_to_provider_playlist_out(playlist) for playlist in playlists]
+
+
+@router.get("/providers/{provider}/resolve", response_model=ProviderPlaylistOut)
+async def resolve_provider_playlist(
+    provider: MusicProvider,
+    url: str = Query(..., min_length=1),
+    current_user: User = Depends(get_current_user),
+):
+    """Resolve a provider playlist URL into playlist metadata."""
+    client = _get_provider_client(provider, current_user)
+    try:
+        playlist = await client.resolve_playlist_url(url)
+    except ProviderAuthError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+    except ProviderAPIError as exc:
+        status_code = status.HTTP_400_BAD_REQUEST if exc.status_code in {400, 404} else status.HTTP_502_BAD_GATEWAY
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return _to_provider_playlist_out(playlist)
 
 
 @router.post("/providers/{provider}", response_model=ProviderPlaylistOut)
@@ -66,12 +103,4 @@ async def create_provider_playlist(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except ProviderAPIError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-    return ProviderPlaylistOut(
-        provider=playlist.provider,
-        provider_playlist_id=playlist.provider_playlist_id,
-        title=playlist.title,
-        description=playlist.description,
-        image_url=playlist.image_url,
-        track_count=playlist.track_count,
-        is_public=playlist.is_public,
-    )
+    return _to_provider_playlist_out(playlist)

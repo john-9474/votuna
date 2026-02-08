@@ -9,17 +9,19 @@ type PlaylistGridPickerProps = {
   options: PlaylistGridOption[]
   selectedKey: string
   onSelect: (key: string) => void
+  emptyMessage?: string
 }
 
 export default function PlaylistGridPicker({
   options,
   selectedKey,
   onSelect,
+  emptyMessage,
 }: PlaylistGridPickerProps) {
   if (options.length === 0) {
     return (
       <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-        No eligible playlists found yet. Create or sync another playlist first.
+        {emptyMessage || 'No eligible playlists found yet. Create or sync another playlist first.'}
       </p>
     )
   }
