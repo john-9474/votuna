@@ -189,6 +189,13 @@ export default function PlaylistDetailPage() {
               onLinkSuggestionUrlChange={state.setLinkSuggestionUrl}
               onSuggestFromLink={state.suggestFromLink}
               suggestStatus={state.suggestStatus}
+              recommendedTracks={state.recommendedTracks}
+              recommendationsStatus={state.recommendationsStatus}
+              isRecommendationsLoading={state.isRecommendationsLoading}
+              onRefreshRecommendations={state.refreshRecommendations}
+              onAcceptRecommendation={state.acceptRecommendation}
+              onDeclineRecommendation={state.declineRecommendation}
+              isRecommendationActionPending={state.isRecommendationActionPending}
             />
 
             {state.isCollaborative ? (

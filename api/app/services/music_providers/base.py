@@ -88,6 +88,15 @@ class MusicProviderClient:
         """Search tracks by free-text query."""
         raise NotImplementedError
 
+    async def related_tracks(
+        self,
+        provider_track_id: str,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> Sequence[ProviderTrack]:
+        """Return provider recommendations related to a seed track."""
+        raise NotImplementedError
+
     async def resolve_track_url(self, url: str) -> ProviderTrack:
         """Resolve a provider track URL to canonical track metadata."""
         raise NotImplementedError

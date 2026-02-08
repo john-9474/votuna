@@ -1,7 +1,8 @@
 """Votuna suggestion routes."""
 from datetime import datetime, timezone
+import hashlib
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -11,6 +12,7 @@ from app.models.votuna_playlist import VotunaPlaylist
 from app.models.votuna_suggestions import VotunaTrackSuggestion
 from app.schemas.votuna_playlist import ProviderTrackOut
 from app.schemas.votuna_suggestion import (
+    VotunaTrackRecommendationDeclineCreate,
     VotunaTrackReactionUpdate,
     VotunaTrackSuggestionCreate,
     VotunaTrackSuggestionOut,
@@ -18,9 +20,13 @@ from app.schemas.votuna_suggestion import (
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
 from app.crud.votuna_track_addition import votuna_track_addition_crud
+from app.crud.votuna_track_recommendation_decline import (
+    votuna_track_recommendation_decline_crud,
+)
 from app.crud.votuna_track_suggestion import votuna_track_suggestion_crud
 from app.crud.votuna_track_vote import votuna_track_vote_crud
 from app.services.music_providers import ProviderAPIError, ProviderAuthError
+from app.services.music_providers.base import ProviderTrack
 from app.api.v1.routes.votuna.common import (
     get_owner_client,
     get_playlist_or_404,
@@ -34,6 +40,9 @@ router = APIRouter()
 
 REJECTED_TRACK_ERROR_CODE = "TRACK_PREVIOUSLY_REJECTED"
 PERSONAL_SUGGESTIONS_ERROR_CODE = "PERSONAL_PLAYLIST_SUGGESTIONS_DISABLED"
+RECOMMENDATION_SEED_LIMIT = 8
+RECOMMENDATION_RELATED_LIMIT_PER_SEED = 25
+RECOMMENDATION_MAX_TRACKS_PER_ARTIST = 2
 
 
 def _display_name(user: User) -> str:
@@ -58,6 +67,43 @@ def _raise_resuggest_conflict() -> None:
             "code": REJECTED_TRACK_ERROR_CODE,
             "message": "Track was previously rejected. Confirm to suggest it again.",
         },
+    )
+
+
+def _ordered_seed_track_ids(
+    current_tracks: list[ProviderTrack],
+    refresh_nonce: str | None,
+) -> list[str]:
+    track_ids: list[str] = []
+    seen: set[str] = set()
+    for track in current_tracks:
+        track_id = (track.provider_track_id or "").strip()
+        if not track_id or track_id in seen:
+            continue
+        seen.add(track_id)
+        track_ids.append(track_id)
+    if not track_ids:
+        return []
+    if not refresh_nonce:
+        return track_ids[:RECOMMENDATION_SEED_LIMIT]
+    nonce = refresh_nonce.strip()
+    if not nonce:
+        return track_ids[:RECOMMENDATION_SEED_LIMIT]
+    ranked = sorted(
+        track_ids,
+        key=lambda track_id: hashlib.sha256(f"{nonce}:{track_id}".encode("utf-8")).hexdigest(),
+    )
+    return ranked[:RECOMMENDATION_SEED_LIMIT]
+
+
+def _serialize_provider_track(track: ProviderTrack) -> ProviderTrackOut:
+    return ProviderTrackOut(
+        provider_track_id=track.provider_track_id,
+        title=track.title,
+        artist=track.artist,
+        genre=track.genre,
+        artwork_url=track.artwork_url,
+        url=track.url,
     )
 
 
@@ -301,6 +347,145 @@ async def search_tracks_for_suggestions(
         )
         for track in results
     ]
+
+
+@router.get("/playlists/{playlist_id}/tracks/recommendations", response_model=list[ProviderTrackOut])
+async def list_recommended_tracks(
+    playlist_id: int,
+    limit: int = Query(5, ge=1, le=10),
+    offset: int = Query(0, ge=0),
+    refresh_nonce: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List personalized track recommendations based on current playlist tracks."""
+    playlist = get_playlist_or_404(db, playlist_id)
+    require_member(db, playlist_id, current_user.id)
+    client = get_owner_client(db, playlist)
+    try:
+        current_tracks = list(await client.list_tracks(playlist.provider_playlist_id))
+    except ProviderAuthError:
+        raise_provider_auth(current_user, owner_id=playlist.owner_user_id)
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if not current_tracks:
+        return []
+
+    seed_track_ids = _ordered_seed_track_ids(current_tracks, refresh_nonce)
+    if not seed_track_ids:
+        return []
+
+    existing_track_ids = {
+        (track.provider_track_id or "").strip()
+        for track in current_tracks
+        if (track.provider_track_id or "").strip()
+    }
+    pending_track_ids = {
+        suggestion.provider_track_id
+        for suggestion in votuna_track_suggestion_crud.list_for_playlist(
+            db,
+            playlist_id,
+            status="pending",
+        )
+    }
+    declined_track_ids = votuna_track_recommendation_decline_crud.list_declined_track_ids(
+        db,
+        playlist_id=playlist_id,
+        user_id=current_user.id,
+    )
+
+    score_by_track_id: dict[str, tuple[int, int, ProviderTrack]] = {}
+    for seed_index, seed_track_id in enumerate(seed_track_ids):
+        try:
+            related_tracks = await client.related_tracks(
+                seed_track_id,
+                limit=RECOMMENDATION_RELATED_LIMIT_PER_SEED,
+                offset=0,
+            )
+        except ProviderAuthError:
+            raise_provider_auth(current_user, owner_id=playlist.owner_user_id)
+        except ProviderAPIError as exc:
+            if exc.status_code in {400, 404}:
+                continue
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+        for track in related_tracks:
+            track_id = (track.provider_track_id or "").strip()
+            if not track_id:
+                continue
+            existing_entry = score_by_track_id.get(track_id)
+            if not existing_entry:
+                score_by_track_id[track_id] = (1, seed_index, track)
+                continue
+            score, first_seed_index, existing_track = existing_entry
+            next_first_seed_index = min(seed_index, first_seed_index)
+            score_by_track_id[track_id] = (score + 1, next_first_seed_index, existing_track)
+
+    if not score_by_track_id:
+        return []
+
+    ranked_entries = sorted(
+        score_by_track_id.items(),
+        key=lambda entry: (
+            -entry[1][0],
+            entry[1][1],
+            entry[0],
+        ),
+    )
+
+    filtered_tracks: list[ProviderTrack] = []
+    artist_counts: dict[str, int] = {}
+    for _track_id, (_score, _first_seed_index, track) in ranked_entries:
+        track_id = (track.provider_track_id or "").strip()
+        if not track_id:
+            continue
+        if track_id in existing_track_ids:
+            continue
+        if track_id in pending_track_ids:
+            continue
+        if track_id in declined_track_ids:
+            continue
+        artist_key = (track.artist or "").strip().lower()
+        if artist_key:
+            current_count = artist_counts.get(artist_key, 0)
+            if current_count >= RECOMMENDATION_MAX_TRACKS_PER_ARTIST:
+                continue
+            artist_counts[artist_key] = current_count + 1
+        filtered_tracks.append(track)
+
+    if not filtered_tracks:
+        return []
+
+    page = filtered_tracks[offset:offset + limit]
+    return [_serialize_provider_track(track) for track in page]
+
+
+@router.post(
+    "/playlists/{playlist_id}/tracks/recommendations/decline",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def decline_track_recommendation(
+    playlist_id: int,
+    payload: VotunaTrackRecommendationDeclineCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist a declined recommendation for one user and playlist."""
+    playlist = get_playlist_or_404(db, playlist_id)
+    require_member(db, playlist_id, current_user.id)
+    provider_track_id = payload.provider_track_id.strip()
+    if not provider_track_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="provider_track_id is required")
+
+    votuna_track_recommendation_decline_crud.upsert_decline(
+        db,
+        playlist_id=playlist.id,
+        user_id=current_user.id,
+        provider_track_id=provider_track_id,
+        declined_at=datetime.now(timezone.utc),
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/playlists/{playlist_id}/suggestions", response_model=VotunaTrackSuggestionOut)

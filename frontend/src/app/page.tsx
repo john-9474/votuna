@@ -120,7 +120,7 @@ function Landing() {
 
   return (
     <main className="relative overflow-hidden">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-14 lg:flex-row lg:items-start">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-6 lg:flex-row lg:items-start">
         <div className="fade-up space-y-6 lg:w-3/5">
           <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2 text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.55)] shadow-sm">
             <span className="h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
@@ -364,7 +364,7 @@ export default function Home() {
 
   if (userQuery.isLoading) {
     return (
-      <main className="mx-auto w-full max-w-6xl px-6 py-16">
+      <main className="mx-auto w-full max-w-6xl px-6 pt-6 pb-16">
         <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
           <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading session...</p>
         </Card>
@@ -381,7 +381,7 @@ export default function Home() {
   const errorMessage = actionError || queryErrorMessage
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-16">
+    <main className="mx-auto w-full max-w-6xl px-6 py-6">
       <div className="fade-up space-y-8">
         <div>
           <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">

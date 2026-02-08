@@ -71,6 +71,10 @@ export type ProviderTrack = {
   suggested_by_display_name?: string | null
 }
 
+export type RecommendationDeclineRequest = {
+  provider_track_id: string
+}
+
 export type PersonalizePlaylistResponse = {
   playlist_type: 'personal'
   removed_collaborators: number

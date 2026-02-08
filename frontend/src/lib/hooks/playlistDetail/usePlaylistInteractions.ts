@@ -20,7 +20,20 @@ type SuggestPayload = {
   allow_resuggest?: boolean
 }
 
+type RecommendationFetchOptions = {
+  reset: boolean
+  nonce: string
+}
+
 const REJECTED_TRACK_ERROR_CODE = 'TRACK_PREVIOUSLY_REJECTED'
+const RECOMMENDATIONS_BATCH_SIZE = 5
+
+function createRefreshNonce(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 function isRejectedTrackConflict(error: unknown): boolean {
   if (!(error instanceof Error)) return false
@@ -46,6 +59,13 @@ export function usePlaylistInteractions({
   const [isSearching, setIsSearching] = useState(false)
   const [linkSuggestionUrl, setLinkSuggestionUrl] = useState('')
   const [removingTrackId, setRemovingTrackId] = useState<string | null>(null)
+  const [recommendedTracks, setRecommendedTracks] = useState<ProviderTrack[]>([])
+  const [recommendationsStatus, setRecommendationsStatus] = useState('')
+  const [isRecommendationsLoading, setIsRecommendationsLoading] = useState(false)
+  const [isRecommendationActionPending, setIsRecommendationActionPending] = useState(false)
+  const [recommendationsOffset, setRecommendationsOffset] = useState(0)
+  const [hasMoreRecommendations, setHasMoreRecommendations] = useState(false)
+  const [recommendationsRefreshNonce, setRecommendationsRefreshNonce] = useState(createRefreshNonce())
 
   useEffect(() => {
     if (isCollaborative) return
@@ -60,6 +80,101 @@ export function usePlaylistInteractions({
     const allKeys = includeMembers ? [...keys, queryKeys.votunaMembers(playlistId)] : keys
     await Promise.all(allKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey })))
   }
+
+  const fetchRecommendationPage = async (
+    offset: number,
+    nonce: string,
+  ): Promise<ProviderTrack[]> => {
+    const query = new URLSearchParams({
+      limit: String(RECOMMENDATIONS_BATCH_SIZE),
+      offset: String(Math.max(0, offset)),
+    })
+    if (nonce.trim()) {
+      query.set('refresh_nonce', nonce.trim())
+    }
+    return apiJson<ProviderTrack[]>(
+      `/api/v1/votuna/playlists/${playlistId}/tracks/recommendations?${query.toString()}`,
+      { authRequired: true },
+    )
+  }
+
+  const fetchRecommendations = async ({
+    reset,
+    nonce,
+  }: RecommendationFetchOptions) => {
+    if (!playlistId) return
+    if (!reset && (!hasMoreRecommendations || isRecommendationsLoading)) return
+    const requestOffset = reset ? 0 : recommendationsOffset
+    setRecommendationsStatus('')
+    setIsRecommendationsLoading(true)
+    try {
+      const results = await fetchRecommendationPage(requestOffset, nonce)
+      setRecommendedTracks((prev) => {
+        const base = reset ? [] : prev
+        const existingIds = new Set(base.map((track) => track.provider_track_id))
+        const merged = [...base]
+        for (const track of results) {
+          if (existingIds.has(track.provider_track_id)) continue
+          existingIds.add(track.provider_track_id)
+          merged.push(track)
+        }
+        return merged
+      })
+      setRecommendationsOffset(requestOffset + results.length)
+      setHasMoreRecommendations(results.length === RECOMMENDATIONS_BATCH_SIZE)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load recommendations'
+      setRecommendationsStatus(message)
+      if (reset) {
+        setRecommendedTracks([])
+        setRecommendationsOffset(0)
+        setHasMoreRecommendations(false)
+      }
+    } finally {
+      setIsRecommendationsLoading(false)
+    }
+  }
+
+  const loadInitialRecommendations = () => {
+    if (!playlistId) return
+    void fetchRecommendations({
+      reset: true,
+      nonce: recommendationsRefreshNonce,
+    })
+  }
+
+  const refreshRecommendations = () => {
+    if (!playlistId) return
+    const nextNonce = createRefreshNonce()
+    setRecommendationsRefreshNonce(nextNonce)
+    setRecommendationsOffset(0)
+    setHasMoreRecommendations(true)
+    void fetchRecommendations({ reset: true, nonce: nextNonce })
+  }
+
+  const loadMoreRecommendations = () => {
+    if (!playlistId) return
+    void fetchRecommendations({
+      reset: false,
+      nonce: recommendationsRefreshNonce,
+    })
+  }
+
+  useEffect(() => {
+    if (!playlistId) {
+      setRecommendedTracks([])
+      setRecommendationsStatus('')
+      setRecommendationsOffset(0)
+      setHasMoreRecommendations(false)
+      return
+    }
+    const nonce = createRefreshNonce()
+    setRecommendationsRefreshNonce(nonce)
+    setRecommendationsOffset(0)
+    setHasMoreRecommendations(true)
+    void fetchRecommendations({ reset: true, nonce })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlistId])
 
   const suggestMutation = useMutation({
     mutationFn: async (payload: SuggestPayload) => {
@@ -234,16 +349,17 @@ export function usePlaylistInteractions({
   const suggestTrack = async (
     payload: SuggestPayload,
     options?: { optimisticProviderTrackId?: string },
-  ) => {
+  ): Promise<boolean> => {
     if (!isCollaborative) {
       setSuggestStatus('')
       try {
         await directAddMutation.mutateAsync(payload)
+        return true
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to add track'
         setSuggestStatus(message)
+        return false
       }
-      return
     }
 
     const optimisticProviderTrackId = options?.optimisticProviderTrackId
@@ -253,6 +369,7 @@ export function usePlaylistInteractions({
     setSuggestStatus('')
     try {
       await runSuggestMutation(payload, false)
+      return true
     } catch (error) {
       if (isRejectedTrackConflict(error) && typeof window !== 'undefined') {
         const shouldResuggest = window.confirm(
@@ -263,11 +380,11 @@ export function usePlaylistInteractions({
           if (optimisticProviderTrackId) {
             unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
           }
-          return
+          return false
         }
         try {
           await runSuggestMutation(payload, true)
-          return
+          return true
         } catch (retryError) {
           const retryMessage =
             retryError instanceof Error ? retryError.message : 'Unable to add suggestion'
@@ -275,7 +392,7 @@ export function usePlaylistInteractions({
           if (optimisticProviderTrackId) {
             unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
           }
-          return
+          return false
         }
       }
       const message = error instanceof Error ? error.message : 'Unable to add suggestion'
@@ -283,6 +400,7 @@ export function usePlaylistInteractions({
       if (optimisticProviderTrackId) {
         unmarkSearchTrackAsSuggested(optimisticProviderTrackId)
       }
+      return false
     }
   }
 
@@ -301,6 +419,81 @@ export function usePlaylistInteractions({
     void suggestTrack({
       track_url: linkSuggestionUrl.trim(),
     })
+  }
+
+  const acceptRecommendation = async (track: ProviderTrack) => {
+    if (!playlistId) return
+    setRecommendationsStatus('')
+    setIsRecommendationActionPending(true)
+    try {
+      const success = await suggestTrack(
+        {
+          provider_track_id: track.provider_track_id,
+          track_title: track.title,
+          track_artist: track.artist ?? null,
+          track_artwork_url: track.artwork_url ?? null,
+          track_url: track.url ?? null,
+        },
+        { optimisticProviderTrackId: track.provider_track_id },
+      )
+      if (!success) return
+      const nextRecommendations = recommendedTracks.filter(
+        (candidate) => candidate.provider_track_id !== track.provider_track_id,
+      )
+      setRecommendedTracks(nextRecommendations)
+      if (
+        nextRecommendations.length < RECOMMENDATIONS_BATCH_SIZE &&
+        hasMoreRecommendations &&
+        !isRecommendationsLoading
+      ) {
+        void loadMoreRecommendations()
+      }
+    } finally {
+      setIsRecommendationActionPending(false)
+    }
+  }
+
+  const declineRecommendation = async (track: ProviderTrack) => {
+    if (!playlistId) return
+    const previousRecommendations = recommendedTracks
+    const nextRecommendations = previousRecommendations.filter(
+      (candidate) => candidate.provider_track_id !== track.provider_track_id,
+    )
+    setRecommendationsStatus('')
+    setIsRecommendationActionPending(true)
+    setRecommendedTracks(nextRecommendations)
+    try {
+      const response = await apiFetch(
+        `/api/v1/votuna/playlists/${playlistId}/tracks/recommendations/decline`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          authRequired: true,
+          body: JSON.stringify({ provider_track_id: track.provider_track_id }),
+        },
+      )
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        const detail =
+          typeof body.detail === 'string'
+            ? body.detail
+            : 'Unable to decline recommendation'
+        throw new Error(detail)
+      }
+      if (
+        nextRecommendations.length < RECOMMENDATIONS_BATCH_SIZE &&
+        hasMoreRecommendations &&
+        !isRecommendationsLoading
+      ) {
+        void loadMoreRecommendations()
+      }
+    } catch (error) {
+      setRecommendedTracks(previousRecommendations)
+      const message = error instanceof Error ? error.message : 'Unable to decline recommendation'
+      setRecommendationsStatus(message)
+    } finally {
+      setIsRecommendationActionPending(false)
+    }
   }
 
   const setSearchQuery = (value: string) => {
@@ -354,5 +547,15 @@ export function usePlaylistInteractions({
     isRemoveTrackPending: removeTrackMutation.isPending,
     removingTrackId,
     trackActionStatus,
+    recommendedTracks,
+    recommendationsStatus,
+    isRecommendationsLoading,
+    isRecommendationActionPending,
+    hasMoreRecommendations,
+    loadInitialRecommendations,
+    loadMoreRecommendations,
+    refreshRecommendations,
+    acceptRecommendation,
+    declineRecommendation,
   }
 }

@@ -1,8 +1,12 @@
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
+from app.crud.votuna_track_recommendation_decline import (
+    votuna_track_recommendation_decline_crud,
+)
 from app.crud.votuna_track_suggestion import votuna_track_suggestion_crud
 from app.crud.votuna_track_vote import votuna_track_vote_crud
 from app.auth.dependencies import get_current_user, get_optional_current_user
+from app.services.music_providers.base import ProviderTrack
 from app.services.music_providers import ProviderAPIError, ProviderAuthError
 from main import app
 
@@ -655,3 +659,234 @@ def test_collaborators_left_to_vote_names(
     data = response.json()
     assert data["collaborators_left_to_vote_count"] == 1
     assert data["collaborators_left_to_vote_names"] == [other_user.display_name]
+
+
+def test_recommendations_default_limit_and_filters(
+    auth_client,
+    db_session,
+    votuna_playlist,
+    user,
+    provider_stub,
+):
+    votuna_track_suggestion_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "provider_track_id": "track-related-3",
+            "track_title": "Already Pending",
+            "suggested_by_user_id": user.id,
+            "status": "pending",
+        },
+    )
+    votuna_track_recommendation_decline_crud.upsert_decline(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        user_id=user.id,
+        provider_track_id="track-related-4",
+        declined_at=votuna_playlist.created_at,
+    )
+
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 4
+    ids = {track["provider_track_id"] for track in data}
+    assert "track-2" not in ids  # already in playlist
+    assert "track-related-3" not in ids  # already pending
+    assert "track-related-4" not in ids  # declined by current user
+
+
+def test_recommendation_decline_is_idempotent(auth_client, db_session, votuna_playlist, user):
+    payload = {"provider_track_id": "track-related-1"}
+    first = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations/decline",
+        json=payload,
+    )
+    second = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations/decline",
+        json=payload,
+    )
+    assert first.status_code == 204
+    assert second.status_code == 204
+    declined = votuna_track_recommendation_decline_crud.list_declined_track_ids(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        user_id=user.id,
+    )
+    assert declined == {"track-related-1"}
+
+
+def test_recommendation_decline_is_user_scoped(
+    client,
+    db_session,
+    votuna_playlist,
+    user,
+    other_user,
+    provider_stub,
+):
+    _set_known_members(db_session, votuna_playlist, user.id, [other_user.id])
+
+    decline = _client_as(client, user).post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations/decline",
+        json={"provider_track_id": "track-related-2"},
+    )
+    assert decline.status_code == 204
+
+    owner_recs = _client_as(client, user).get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    member_recs = _client_as(client, other_user).get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert owner_recs.status_code == 200
+    assert member_recs.status_code == 200
+    owner_ids = {track["provider_track_id"] for track in owner_recs.json()}
+    member_ids = {track["provider_track_id"] for track in member_recs.json()}
+    assert "track-related-2" not in owner_ids
+    assert "track-related-2" in member_ids
+
+
+def test_recommendations_offset_pagination_with_same_nonce(auth_client, votuna_playlist, provider_stub):
+    first_page = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 2, "offset": 0, "refresh_nonce": "stable-seed"},
+    )
+    second_page = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 2, "offset": 2, "refresh_nonce": "stable-seed"},
+    )
+    first_page_repeat = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 2, "offset": 0, "refresh_nonce": "stable-seed"},
+    )
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert first_page_repeat.status_code == 200
+
+    ids_page_one = [track["provider_track_id"] for track in first_page.json()]
+    ids_page_two = [track["provider_track_id"] for track in second_page.json()]
+    ids_page_one_repeat = [track["provider_track_id"] for track in first_page_repeat.json()]
+    assert ids_page_one == ids_page_one_repeat
+    assert set(ids_page_one).isdisjoint(set(ids_page_two))
+
+
+def test_recommendations_refresh_nonce_changes_order(auth_client, votuna_playlist, provider_stub):
+    nonce_a = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 5, "refresh_nonce": "nonce-0"},
+    )
+    nonce_b = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 5, "refresh_nonce": "nonce-4"},
+    )
+    assert nonce_a.status_code == 200
+    assert nonce_b.status_code == 200
+    ids_a = [track["provider_track_id"] for track in nonce_a.json()]
+    ids_b = [track["provider_track_id"] for track in nonce_b.json()]
+    assert ids_a != ids_b
+
+
+def test_recommendations_limit_artist_concentration(auth_client, votuna_playlist, provider_stub):
+    provider_stub.related_tracks_by_seed = {
+        "track-1": [
+            ProviderTrack(
+                provider_track_id=f"same-artist-{index}",
+                title=f"Same Artist {index}",
+                artist="JmeBBK",
+                genre="House",
+                artwork_url=None,
+                url=f"https://soundcloud.com/test/same-artist-{index}",
+            )
+            for index in range(8)
+        ],
+        "track-2": [
+            ProviderTrack(
+                provider_track_id=f"other-artist-{index}",
+                title=f"Other Artist {index}",
+                artist=f"Other {index}",
+                genre="House",
+                artwork_url=None,
+                url=f"https://soundcloud.com/test/other-artist-{index}",
+            )
+            for index in range(8)
+        ],
+    }
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 10, "refresh_nonce": "artist-diversity"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    jme_count = sum(1 for track in data if (track.get("artist") or "").lower() == "jmebbk")
+    assert jme_count <= 2
+
+
+def test_recommendations_provider_auth_owner_returns_401(
+    auth_client,
+    votuna_playlist,
+    provider_stub,
+    monkeypatch,
+):
+    async def _raise_auth_error(self, provider_track_id: str, limit: int = 25, offset: int = 0):
+        raise ProviderAuthError("expired")
+
+    monkeypatch.setattr(provider_stub, "related_tracks", _raise_auth_error)
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert response.status_code == 401
+
+
+def test_recommendations_provider_auth_member_returns_409(
+    other_auth_client,
+    db_session,
+    votuna_playlist,
+    other_user,
+    provider_stub,
+    monkeypatch,
+):
+    votuna_playlist_member_crud.create(
+        db_session,
+        {"playlist_id": votuna_playlist.id, "user_id": other_user.id, "role": "member"},
+    )
+
+    async def _raise_auth_error(self, provider_track_id: str, limit: int = 25, offset: int = 0):
+        raise ProviderAuthError("expired")
+
+    monkeypatch.setattr(provider_stub, "related_tracks", _raise_auth_error)
+    response = other_auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Playlist owner must reconnect SoundCloud"
+
+
+def test_recommendations_provider_api_error_returns_502(
+    auth_client,
+    votuna_playlist,
+    provider_stub,
+    monkeypatch,
+):
+    async def _raise_provider_error(self, provider_track_id: str, limit: int = 25, offset: int = 0):
+        raise ProviderAPIError("provider unavailable")
+
+    monkeypatch.setattr(provider_stub, "related_tracks", _raise_provider_error)
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert response.status_code == 502
+    assert response.json()["detail"] == "provider unavailable"
+
+
+def test_recommendations_requires_member(other_auth_client, votuna_playlist):
+    list_response = other_auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    decline_response = other_auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations/decline",
+        json={"provider_track_id": "track-related-2"},
+    )
+    assert list_response.status_code == 403
+    assert decline_response.status_code == 403

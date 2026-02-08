@@ -311,6 +311,45 @@ class SoundcloudProvider(MusicProviderClient):
                 results.append(mapped_track)
         return results
 
+    async def related_tracks(
+        self,
+        provider_track_id: str,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> Sequence[ProviderTrack]:
+        track_id = provider_track_id.strip()
+        if not track_id:
+            return []
+        safe_limit = max(1, min(limit, 50))
+        safe_offset = max(0, offset)
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+            response = await client.get(
+                f"/tracks/{track_id}/related",
+                headers=self._headers(),
+                params={
+                    **self._params(),
+                    "limit": safe_limit,
+                    "offset": safe_offset,
+                    "linked_partitioning": 1,
+                },
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+        raw_items: list[Any]
+        if isinstance(payload, list):
+            raw_items = payload
+        elif isinstance(payload, dict):
+            collection = payload.get("collection")
+            raw_items = collection if isinstance(collection, list) else []
+        else:
+            raw_items = []
+        results: list[ProviderTrack] = []
+        for item in raw_items:
+            mapped_track = self._to_provider_track(item)
+            if mapped_track:
+                results.append(mapped_track)
+        return results
+
     async def resolve_track_url(self, url: str) -> ProviderTrack:
         track_url = url.strip()
         if not track_url:

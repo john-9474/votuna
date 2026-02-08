@@ -49,5 +49,10 @@ class VotunaPlaylist(BaseModel):
         back_populates="playlist",
         cascade="all, delete-orphan",
     )
+    recommendation_declines = relationship(
+        "VotunaTrackRecommendationDecline",
+        back_populates="playlist",
+        cascade="all, delete-orphan",
+    )
 
 

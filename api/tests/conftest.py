@@ -141,6 +141,78 @@ class DummyProvider:
     add_tracks_calls: list[dict] = []
     fail_add_chunk_for_track_ids: set[str] = set()
     fail_add_single_for_track_ids: set[str] = set()
+    related_tracks_by_seed = {
+        "track-1": [
+            ProviderTrack(
+                provider_track_id="track-related-1",
+                title="Related One",
+                artist="Related Artist One",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-one",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-2",
+                title="Related Two",
+                artist="Related Artist Two",
+                genre="Techno",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-two",
+            ),
+            ProviderTrack(
+                provider_track_id="track-2",
+                title="Test Track Two",
+                artist="Artist Two",
+                genre="UKG",
+                artwork_url=None,
+                url="https://soundcloud.com/test/track-2",
+            ),
+        ],
+        "track-2": [
+            ProviderTrack(
+                provider_track_id="track-related-2",
+                title="Related Two",
+                artist="Related Artist Two",
+                genre="Techno",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-two",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-3",
+                title="Related Three",
+                artist="Related Artist Three",
+                genre="Garage",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-three",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-4",
+                title="Related Four",
+                artist="Related Artist Four",
+                genre="Bass",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-four",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-5",
+                title="Related Five",
+                artist="Related Artist Five",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-five",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-6",
+                title="Related Six",
+                artist="Related Artist Six",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-six",
+            ),
+        ],
+    }
+    related_tracks_calls: list[dict] = []
+    fail_related_status_code: int | None = None
 
     def __init__(self, access_token: str):
         self.access_token = access_token
@@ -183,6 +255,25 @@ class DummyProvider:
         if not query.strip():
             return []
         return self.search_tracks_results[:limit]
+
+    async def related_tracks(self, provider_track_id: str, limit: int = 25, offset: int = 0):
+        if self.fail_related_status_code is not None:
+            raise ProviderAPIError(
+                "provider unavailable",
+                status_code=self.fail_related_status_code,
+            )
+        seed_id = str(provider_track_id).strip()
+        self.related_tracks_calls.append(
+            {
+                "provider_track_id": seed_id,
+                "limit": limit,
+                "offset": offset,
+            }
+        )
+        tracks = self.related_tracks_by_seed.get(seed_id, [])
+        safe_offset = max(0, int(offset))
+        safe_limit = max(1, int(limit))
+        return tracks[safe_offset:safe_offset + safe_limit]
 
     async def search_playlists(self, query: str, limit: int = 10):
         if not query.strip():
@@ -553,6 +644,78 @@ def provider_stub(monkeypatch):
     DummyProvider.add_tracks_calls = []
     DummyProvider.fail_add_chunk_for_track_ids = set()
     DummyProvider.fail_add_single_for_track_ids = set()
+    DummyProvider.related_tracks_by_seed = {
+        "track-1": [
+            ProviderTrack(
+                provider_track_id="track-related-1",
+                title="Related One",
+                artist="Related Artist One",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-one",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-2",
+                title="Related Two",
+                artist="Related Artist Two",
+                genre="Techno",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-two",
+            ),
+            ProviderTrack(
+                provider_track_id="track-2",
+                title="Test Track Two",
+                artist="Artist Two",
+                genre="UKG",
+                artwork_url=None,
+                url="https://soundcloud.com/test/track-2",
+            ),
+        ],
+        "track-2": [
+            ProviderTrack(
+                provider_track_id="track-related-2",
+                title="Related Two",
+                artist="Related Artist Two",
+                genre="Techno",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-two",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-3",
+                title="Related Three",
+                artist="Related Artist Three",
+                genre="Garage",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-three",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-4",
+                title="Related Four",
+                artist="Related Artist Four",
+                genre="Bass",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-four",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-5",
+                title="Related Five",
+                artist="Related Artist Five",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-five",
+            ),
+            ProviderTrack(
+                provider_track_id="track-related-6",
+                title="Related Six",
+                artist="Related Artist Six",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/related-six",
+            ),
+        ],
+    }
+    DummyProvider.related_tracks_calls = []
+    DummyProvider.fail_related_status_code = None
 
     def _factory(provider: str, access_token: str):
         return DummyProvider(access_token)

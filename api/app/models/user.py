@@ -50,3 +50,8 @@ class User(BaseModel):
         "VotunaTrackAddition",
         back_populates="added_by_user",
     )
+    votuna_recommendation_declines = relationship(
+        "VotunaTrackRecommendationDecline",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

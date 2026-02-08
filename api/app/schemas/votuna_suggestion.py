@@ -29,6 +29,10 @@ class VotunaTrackReactionUpdate(BaseModel):
     reaction: SuggestionReaction | None = None
 
 
+class VotunaTrackRecommendationDeclineCreate(BaseModel):
+    provider_track_id: str
+
+
 class VotunaTrackSuggestionOut(BaseModel):
     id: int
     playlist_id: int
