@@ -49,3 +49,42 @@ def test_list_members_with_suggested_count(auth_client, db_session, votuna_playl
 def test_list_members_non_member_forbidden(other_auth_client, votuna_playlist):
     response = other_auth_client.get(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members")
     assert response.status_code == 403
+
+
+def test_owner_can_remove_collaborator(auth_client, db_session, votuna_playlist, other_user):
+    membership = votuna_playlist_member_crud.create(
+        db_session,
+        {"playlist_id": votuna_playlist.id, "user_id": other_user.id, "role": "member"},
+    )
+    response = auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members/{other_user.id}")
+    assert response.status_code == 204
+    removed = votuna_playlist_member_crud.get(db_session, membership.id)
+    assert removed is None
+
+
+def test_owner_remove_owner_rejected(auth_client, votuna_playlist, user):
+    response = auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members/{user.id}")
+    assert response.status_code == 400
+    assert "owner" in response.json()["detail"].lower()
+
+
+def test_non_owner_cannot_remove_member(other_auth_client, db_session, votuna_playlist, user):
+    response = other_auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members/{user.id}")
+    assert response.status_code == 403
+
+
+def test_collaborator_can_leave_playlist(other_auth_client, db_session, votuna_playlist, other_user):
+    membership = votuna_playlist_member_crud.create(
+        db_session,
+        {"playlist_id": votuna_playlist.id, "user_id": other_user.id, "role": "member"},
+    )
+    response = other_auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members/me")
+    assert response.status_code == 204
+    removed = votuna_playlist_member_crud.get(db_session, membership.id)
+    assert removed is None
+
+
+def test_owner_cannot_leave_playlist(auth_client, votuna_playlist):
+    response = auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/members/me")
+    assert response.status_code == 400
+    assert "owner" in response.json()["detail"].lower()

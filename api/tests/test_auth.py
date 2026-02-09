@@ -125,6 +125,51 @@ def test_callback_auto_joins_invite_and_redirects_to_playlist(
     assert membership is not None
 
 
+def test_callback_does_not_auto_accept_targeted_invites_without_invite_context(
+    client,
+    db_session,
+    monkeypatch,
+    votuna_playlist,
+):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
+    invite = votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "invite_type": "user",
+            "token": "pending-token-without-cookie",
+            "expires_at": None,
+            "max_uses": 1,
+            "uses_count": 0,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+            "target_auth_provider": "soundcloud",
+            "target_provider_user_id": "sc-user",
+            "target_username_snapshot": "TestUser",
+            "target_user_id": None,
+            "accepted_by_user_id": None,
+            "accepted_at": None,
+        },
+    )
+    response = client.get("/api/v1/auth/callback/soundcloud", follow_redirects=False)
+    assert response.status_code in {302, 307}
+    assert response.headers["location"] == settings.FRONTEND_URL
+
+    user = user_crud.get_by_provider_id(db_session, "soundcloud", "sc-user")
+    assert user is not None
+    membership = votuna_playlist_member_crud.get_member(db_session, votuna_playlist.id, user.id)
+    assert membership is None
+
+    refreshed_invite = votuna_playlist_invite_crud.get(db_session, invite.id)
+    assert refreshed_invite is not None
+    assert refreshed_invite.accepted_at is None
+    assert refreshed_invite.accepted_by_user_id is None
+    assert refreshed_invite.uses_count == 0
+    assert refreshed_invite.is_revoked is False
+
+
 def test_logout_clears_cookie(client):
     response = client.post("/api/v1/auth/logout")
     assert response.status_code == 200

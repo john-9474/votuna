@@ -84,22 +84,3 @@ def join_invite_by_token(db: Session, token: str, user: User):
     if not invite:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found")
     return join_invite(db, invite, user)
-
-
-def auto_accept_pending_targeted_invites(db: Session, user: User) -> list[int]:
-    """Auto-accept targeted invites after successful login."""
-    invite_rows = votuna_playlist_invite_crud.list_pending_user_invites_for_identity(
-        db=db,
-        auth_provider=user.auth_provider,
-        provider_user_id=user.provider_user_id,
-        user_id=user.id,
-    )
-    joined_playlist_ids: list[int] = []
-    for invite in invite_rows:
-        try:
-            playlist = join_invite(db, invite, user)
-            joined_playlist_ids.append(playlist.id)
-        except HTTPException:
-            # Keep login resilient even if one pending invite is invalid.
-            continue
-    return joined_playlist_ids

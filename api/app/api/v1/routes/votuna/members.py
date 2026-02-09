@@ -2,7 +2,7 @@
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.votuna_suggestions import VotunaTrackSuggestion
 from app.schemas.votuna_member import VotunaPlaylistMemberOut
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
-from app.api.v1.routes.votuna.common import require_member
+from app.api.v1.routes.votuna.common import get_playlist_or_404, require_member, require_owner
 
 router = APIRouter()
 
@@ -62,3 +62,46 @@ def list_votuna_members(
             )
         )
     return payload
+
+
+@router.delete("/playlists/{playlist_id}/members/me", status_code=status.HTTP_204_NO_CONTENT)
+def leave_votuna_playlist(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Allow a collaborator to leave a playlist."""
+    playlist = get_playlist_or_404(db, playlist_id)
+    membership = require_member(db, playlist_id, current_user.id)
+    if playlist.owner_user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Playlist owner cannot leave the playlist",
+        )
+    db.delete(membership)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/playlists/{playlist_id}/members/{member_user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_votuna_member(
+    playlist_id: int,
+    member_user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Allow a playlist owner to remove a collaborator."""
+    playlist = require_owner(db, playlist_id, current_user.id)
+    if member_user_id == playlist.owner_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot remove playlist owner",
+        )
+
+    membership = votuna_playlist_member_crud.get_member(db, playlist_id, member_user_id)
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+
+    db.delete(membership)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

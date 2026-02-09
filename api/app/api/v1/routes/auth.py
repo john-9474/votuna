@@ -21,7 +21,7 @@ from app.config.settings import settings
 from app.crud.user import user_crud
 from app.crud.user_settings import user_settings_crud
 from app.db.session import get_db
-from app.services.votuna_invites import auto_accept_pending_targeted_invites, join_invite_by_token
+from app.services.votuna_invites import join_invite_by_token
 from app.utils.avatar_storage import (
     delete_avatar_if_exists,
     get_avatar_file_path,
@@ -223,11 +223,6 @@ async def callback_provider(
             invite_joined_playlist_id = joined_playlist.id
         except HTTPException as exc:
             invite_error = str(exc.detail)
-
-    if invite_joined_playlist_id is None:
-        joined_playlist_ids = auto_accept_pending_targeted_invites(db, user)
-        if joined_playlist_ids:
-            invite_joined_playlist_id = joined_playlist_ids[0]
 
     if invite_error:
         redirect_target = f"{settings.FRONTEND_URL.rstrip('/')}/?invite_error={quote(invite_error)}"

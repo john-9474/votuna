@@ -56,3 +56,15 @@ class VotunaPlaylistInviteOut(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VotunaPendingInviteOut(BaseModel):
+    invite_id: int
+    playlist_id: int
+    playlist_title: str
+    playlist_image_url: str | None = None
+    playlist_provider: MusicProvider
+    owner_user_id: int
+    owner_display_name: str | None = None
+    created_at: datetime
+    expires_at: datetime | None = None

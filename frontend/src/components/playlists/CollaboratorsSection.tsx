@@ -5,6 +5,7 @@ import { useState } from 'react'
 
 import { API_URL } from '@/lib/api'
 import type { usePlaylistInvites } from '@/lib/hooks/playlistDetail/usePlaylistInvites'
+import type { usePlaylistMembers } from '@/lib/hooks/playlistDetail/usePlaylistMembers'
 import type { PlaylistMember } from '@/lib/types/votuna'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
@@ -15,6 +16,7 @@ type CollaboratorsSectionProps = {
   members: PlaylistMember[]
   isLoading: boolean
   invites: ReturnType<typeof usePlaylistInvites>
+  memberActions: ReturnType<typeof usePlaylistMembers>
 }
 
 const buildMemberAvatarSrc = (member: PlaylistMember) => {
@@ -27,6 +29,7 @@ export default function CollaboratorsSection({
   members,
   isLoading,
   invites,
+  memberActions,
 }: CollaboratorsSectionProps) {
   const [copyStatus, setCopyStatus] = useState('')
 
@@ -48,14 +51,25 @@ export default function CollaboratorsSection({
             People already collaborating and pending invites.
           </p>
         </div>
-        {invites.canInvite ? (
-          <Button
-            onClick={invites.modal.open}
-            className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
-          >
-            Invite
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {memberActions.canLeavePlaylist ? (
+            <Button
+              onClick={memberActions.leave.run}
+              disabled={memberActions.leave.isPending}
+              className="rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {memberActions.leave.isPending ? 'Leaving...' : 'Leave playlist'}
+            </Button>
+          ) : null}
+          {invites.canInvite ? (
+            <Button
+              onClick={invites.modal.open}
+              className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
+            >
+              Invite
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {isLoading ? (
@@ -66,6 +80,10 @@ export default function CollaboratorsSection({
         <div className="mt-4 space-y-3">
           {members.map((member) => {
             const avatarSrc = buildMemberAvatarSrc(member)
+            const canRemoveMember = memberActions.canManageMembers && member.role !== 'owner'
+            const isRemovingMember =
+              memberActions.remove.isPending &&
+              memberActions.remove.removingMemberUserId === member.user_id
             return (
               <div
                 key={member.user_id}
@@ -107,12 +125,24 @@ export default function CollaboratorsSection({
                   <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">
                     {member.role}
                   </p>
+                  {canRemoveMember ? (
+                    <button
+                      type="button"
+                      onClick={() => memberActions.remove.run(member.user_id)}
+                      disabled={memberActions.remove.isPending}
+                      className="mt-2 inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isRemovingMember ? 'Removing...' : 'Remove'}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             )
           })}
         </div>
       )}
+      {memberActions.error ? <p className="mt-3 text-xs text-rose-500">{memberActions.error}</p> : null}
+      {memberActions.status ? <p className="mt-3 text-xs text-emerald-600">{memberActions.status}</p> : null}
 
       {invites.canInvite ? (
         invites.isPendingInvitesLoading ? (

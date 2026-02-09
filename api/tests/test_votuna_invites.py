@@ -9,24 +9,37 @@ from app.services.music_providers.base import ProviderUser
 from main import app
 
 
-def _create_targeted_invite(db_session, playlist_id: int, owner_user_id: int, provider_user_id: str):
+def _create_targeted_invite(
+    db_session,
+    playlist_id: int,
+    owner_user_id: int,
+    provider_user_id: str,
+    *,
+    expires_at: datetime | None = None,
+    max_uses: int | None = 1,
+    uses_count: int = 0,
+    is_revoked: bool = False,
+    target_user_id: int | None = None,
+    accepted_by_user_id: int | None = None,
+    accepted_at: datetime | None = None,
+):
     return votuna_playlist_invite_crud.create(
         db_session,
         {
             "playlist_id": playlist_id,
             "invite_type": "user",
             "token": f"invite-token-{uuid.uuid4().hex}",
-            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
-            "max_uses": 1,
-            "uses_count": 0,
-            "is_revoked": False,
+            "expires_at": expires_at if expires_at is not None else datetime.now(timezone.utc) + timedelta(hours=1),
+            "max_uses": max_uses,
+            "uses_count": uses_count,
+            "is_revoked": is_revoked,
             "created_by_user_id": owner_user_id,
             "target_auth_provider": "soundcloud",
             "target_provider_user_id": provider_user_id,
             "target_username_snapshot": provider_user_id,
-            "target_user_id": None,
-            "accepted_by_user_id": None,
-            "accepted_at": None,
+            "target_user_id": target_user_id,
+            "accepted_by_user_id": accepted_by_user_id,
+            "accepted_at": accepted_at,
         },
     )
 
@@ -315,6 +328,173 @@ def test_join_targeted_invite_matching_user_success(client, db_session, votuna_p
     assert response.status_code == 200
     membership = votuna_playlist_member_crud.get_member(db_session, votuna_playlist.id, target_user.id)
     assert membership is not None
+
+
+def test_list_pending_invites_returns_only_actionable_targeted_invites(
+    auth_client,
+    db_session,
+    votuna_playlist,
+    user,
+):
+    active = _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        target_user_id=user.id,
+    )
+    _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        expires_at=datetime.now(timezone.utc) - timedelta(minutes=5),
+    )
+    _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        max_uses=1,
+        uses_count=1,
+    )
+    _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        is_revoked=True,
+    )
+    _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        accepted_by_user_id=user.id,
+        accepted_at=datetime.now(timezone.utc),
+    )
+    _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id="different-provider-user",
+    )
+    votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "invite_type": "link",
+            "token": f"invite-token-{uuid.uuid4().hex}",
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "max_uses": 1,
+            "uses_count": 0,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+            "target_auth_provider": None,
+            "target_provider_user_id": None,
+            "target_username_snapshot": None,
+            "target_user_id": None,
+            "accepted_by_user_id": None,
+            "accepted_at": None,
+        },
+    )
+
+    response = auth_client.get("/api/v1/votuna/invites/pending")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    pending = data[0]
+    assert pending["invite_id"] == active.id
+    assert pending["playlist_id"] == votuna_playlist.id
+    assert pending["playlist_title"] == votuna_playlist.title
+    assert pending["playlist_provider"] == votuna_playlist.provider
+    assert pending["owner_user_id"] == votuna_playlist.owner_user_id
+    assert pending["owner_display_name"] == user.display_name
+
+
+def test_accept_pending_invite_success(other_auth_client, db_session, votuna_playlist, other_user):
+    invite = _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=other_user.provider_user_id,
+        target_user_id=other_user.id,
+    )
+
+    pending_before = other_auth_client.get("/api/v1/votuna/invites/pending")
+    assert pending_before.status_code == 200
+    assert any(item["invite_id"] == invite.id for item in pending_before.json())
+
+    response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.id}/accept")
+    assert response.status_code == 200
+    assert response.json()["id"] == votuna_playlist.id
+
+    membership = votuna_playlist_member_crud.get_member(db_session, votuna_playlist.id, other_user.id)
+    assert membership is not None
+
+    updated_invite = votuna_playlist_invite_crud.get(db_session, invite.id)
+    assert updated_invite is not None
+    assert updated_invite.accepted_by_user_id == other_user.id
+    assert updated_invite.accepted_at is not None
+    assert updated_invite.uses_count == 1
+
+    pending_after = other_auth_client.get("/api/v1/votuna/invites/pending")
+    assert pending_after.status_code == 200
+    assert all(item["invite_id"] != invite.id for item in pending_after.json())
+
+
+def test_decline_pending_invite_success(other_auth_client, db_session, votuna_playlist, other_user):
+    invite = _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=other_user.provider_user_id,
+        target_user_id=other_user.id,
+    )
+
+    pending_before = other_auth_client.get("/api/v1/votuna/invites/pending")
+    assert pending_before.status_code == 200
+    assert any(item["invite_id"] == invite.id for item in pending_before.json())
+
+    response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.id}/decline")
+    assert response.status_code == 204
+
+    membership = votuna_playlist_member_crud.get_member(db_session, votuna_playlist.id, other_user.id)
+    assert membership is None
+
+    updated_invite = votuna_playlist_invite_crud.get(db_session, invite.id)
+    assert updated_invite is not None
+    assert updated_invite.is_revoked is True
+    assert updated_invite.accepted_at is None
+    assert updated_invite.accepted_by_user_id is None
+
+    pending_after = other_auth_client.get("/api/v1/votuna/invites/pending")
+    assert pending_after.status_code == 200
+    assert all(item["invite_id"] != invite.id for item in pending_after.json())
+
+
+def test_accept_pending_invite_target_mismatch_forbidden(other_auth_client, db_session, votuna_playlist, user):
+    invite = _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        target_user_id=user.id,
+    )
+    response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.id}/accept")
+    assert response.status_code == 403
+
+
+def test_decline_pending_invite_target_mismatch_forbidden(other_auth_client, db_session, votuna_playlist, user):
+    invite = _create_targeted_invite(
+        db_session,
+        playlist_id=votuna_playlist.id,
+        owner_user_id=votuna_playlist.owner_user_id,
+        provider_user_id=user.provider_user_id,
+        target_user_id=user.id,
+    )
+    response = other_auth_client.post(f"/api/v1/votuna/invites/{invite.id}/decline")
+    assert response.status_code == 403
 
 
 def test_open_invite_redirects_to_login_when_unauthenticated(client, db_session, votuna_playlist):

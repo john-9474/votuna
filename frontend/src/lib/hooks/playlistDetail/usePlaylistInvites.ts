@@ -84,7 +84,7 @@ export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePl
     },
     onSuccess: async (invite) => {
       const target = invite.target_username_snapshot || invite.target_provider_user_id || 'User'
-      setInviteStatus(`Invite sent to ${target}. They will join after login.`)
+      setInviteStatus(`Invite sent to ${target}. They can accept from their dashboard after login.`)
       await queryClient.invalidateQueries({ queryKey: queryKeys.votunaMembers(playlistId) })
       await queryClient.invalidateQueries({ queryKey: queryKeys.votunaInvites(playlistId) })
     },

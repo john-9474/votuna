@@ -6,8 +6,9 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import type { PendingInvite, VotunaPlaylist } from '@/lib/types/votuna'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
-import { apiJson, ApiError } from '../lib/api'
+import { apiFetch, apiJson, ApiError } from '../lib/api'
 
 type ProviderPlaylist = {
   provider: string
@@ -19,12 +20,9 @@ type ProviderPlaylist = {
   is_public?: boolean | null
 }
 
-type VotunaPlaylist = {
-  id: number
-  provider: string
-  provider_playlist_id: string
-  title: string
-}
+const EMPTY_PROVIDER_PLAYLISTS: ProviderPlaylist[] = []
+const EMPTY_VOTUNA_PLAYLISTS: VotunaPlaylist[] = []
+const EMPTY_PENDING_INVITES: PendingInvite[] = []
 
 /** Landing page hero content. */
 function Landing() {
@@ -269,8 +267,10 @@ export default function Home() {
   const queryClient = useQueryClient()
   const [newPlaylistTitle, setNewPlaylistTitle] = useState('')
   const [newPlaylistIsPublic, setNewPlaylistIsPublic] = useState(false)
-  const [actionError, setActionError] = useState('')
+  const [playlistActionError, setPlaylistActionError] = useState('')
+  const [inviteActionError, setInviteActionError] = useState('')
   const [enabling, setEnabling] = useState<Record<string, boolean>>({})
+  const [pendingInviteActions, setPendingInviteActions] = useState<Record<number, 'accept' | 'decline'>>({})
 
   const userQuery = useCurrentUser()
   const user = userQuery.data ?? null
@@ -292,18 +292,40 @@ export default function Home() {
     staleTime: 10_000,
   })
 
-  const providerPlaylists = providerQuery.data ?? []
-  const playlistsLoading = providerQuery.isLoading || votunaQuery.isLoading
+  const pendingInvitesQuery = useQuery({
+    queryKey: queryKeys.votunaPendingInvites,
+    queryFn: () => apiJson<PendingInvite[]>('/api/v1/votuna/invites/pending', { authRequired: true }),
+    enabled: !!user?.id,
+    refetchInterval: 30_000,
+    staleTime: 10_000,
+  })
+
+  const providerPlaylists = providerQuery.data ?? EMPTY_PROVIDER_PLAYLISTS
+  const votunaPlaylists = votunaQuery.data ?? EMPTY_VOTUNA_PLAYLISTS
+  const pendingInvites = pendingInvitesQuery.data ?? EMPTY_PENDING_INVITES
+  const providerDashboardLoading = providerQuery.isLoading || votunaQuery.isLoading
 
   const votunaMap = useMemo(() => {
-    const votunaPlaylists = votunaQuery.data ?? []
     return new Map(
       votunaPlaylists.map((playlist) => [
         `${playlist.provider}:${playlist.provider_playlist_id}`,
         playlist,
       ]),
     )
-  }, [votunaQuery.data])
+  }, [votunaPlaylists])
+
+  const collaboratorVotunaPlaylists = useMemo(
+    () => votunaPlaylists.filter((playlist) => playlist.owner_user_id !== user?.id),
+    [votunaPlaylists, user?.id],
+  )
+
+  const clearPendingInviteAction = (inviteId: number) => {
+    setPendingInviteActions((prev) => {
+      const next = { ...prev }
+      delete next[inviteId]
+      return next
+    })
+  }
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -319,7 +341,7 @@ export default function Home() {
       })
     },
     onMutate: () => {
-      setActionError('')
+      setPlaylistActionError('')
     },
     onSuccess: () => {
       setNewPlaylistTitle('')
@@ -328,7 +350,7 @@ export default function Home() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Unable to create playlist'
-      setActionError(message)
+      setPlaylistActionError(message)
     },
   })
 
@@ -345,7 +367,7 @@ export default function Home() {
       })
     },
     onMutate: (playlist) => {
-      setActionError('')
+      setPlaylistActionError('')
       setEnabling((prev) => ({ ...prev, [playlist.provider_playlist_id]: true }))
     },
     onSuccess: () => {
@@ -354,11 +376,68 @@ export default function Home() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Unable to enable Votuna'
-      setActionError(message)
+      setPlaylistActionError(message)
     },
     onSettled: (_data, _error, playlist) => {
       if (!playlist) return
       setEnabling((prev) => ({ ...prev, [playlist.provider_playlist_id]: false }))
+    },
+  })
+
+  const acceptInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) =>
+      apiJson<VotunaPlaylist>(`/api/v1/votuna/invites/${inviteId}/accept`, {
+        method: 'POST',
+        authRequired: true,
+      }),
+    onMutate: (inviteId) => {
+      setInviteActionError('')
+      setPendingInviteActions((prev) => ({ ...prev, [inviteId]: 'accept' }))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.votunaPendingInvites })
+      queryClient.invalidateQueries({ queryKey: queryKeys.votunaPlaylists })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to accept invite'
+      setInviteActionError(message)
+    },
+    onSettled: (_data, _error, inviteId) => {
+      if (typeof inviteId !== 'number') return
+      clearPendingInviteAction(inviteId)
+    },
+  })
+
+  const declineInviteMutation = useMutation({
+    mutationFn: async (inviteId: number) => {
+      const response = await apiFetch(`/api/v1/votuna/invites/${inviteId}/decline`, {
+        method: 'POST',
+        authRequired: true,
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        const message = typeof body.detail === 'string' ? body.detail : 'Unable to decline invite'
+        const error: ApiError = new Error(message)
+        error.status = response.status
+        error.detail = message
+        throw error
+      }
+      return inviteId
+    },
+    onMutate: (inviteId) => {
+      setInviteActionError('')
+      setPendingInviteActions((prev) => ({ ...prev, [inviteId]: 'decline' }))
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.votunaPendingInvites })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to decline invite'
+      setInviteActionError(message)
+    },
+    onSettled: (_data, _error, inviteId) => {
+      if (typeof inviteId !== 'number') return
+      clearPendingInviteAction(inviteId)
     },
   })
 
@@ -376,9 +455,15 @@ export default function Home() {
     return <Landing />
   }
 
-  const queryError = (providerQuery.error || votunaQuery.error) as ApiError | null
-  const queryErrorMessage = queryError?.detail || queryError?.message || ''
-  const errorMessage = actionError || queryErrorMessage
+  const playlistQueryError = (providerQuery.error || votunaQuery.error) as ApiError | null
+  const playlistQueryErrorMessage = playlistQueryError?.detail || playlistQueryError?.message || ''
+  const playlistErrorMessage = playlistActionError || playlistQueryErrorMessage
+  const pendingInvitesQueryError = pendingInvitesQuery.error as ApiError | null
+  const pendingInvitesErrorMessage =
+    inviteActionError || pendingInvitesQueryError?.detail || pendingInvitesQueryError?.message || ''
+  const isCollaboratorSectionLoading = votunaQuery.isLoading || pendingInvitesQuery.isLoading
+  const hasCollaboratorContent = collaboratorVotunaPlaylists.length > 0 || pendingInvites.length > 0
+  const shouldShowCollaboratorSection = isCollaboratorSectionLoading || hasCollaboratorContent
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-6">
@@ -388,7 +473,7 @@ export default function Home() {
             Dashboard
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-[rgb(var(--votuna-ink))]">
-            Your playlists
+            Playlist dashboard
           </h1>
         </div>
 
@@ -440,15 +525,94 @@ export default function Home() {
               </Button>
             </div>
           </div>
-          {errorMessage ? <p className="mt-4 text-xs text-rose-500">{errorMessage}</p> : null}
+          {playlistErrorMessage ? <p className="mt-4 text-xs text-rose-500">{playlistErrorMessage}</p> : null}
         </Card>
+
+        {shouldShowCollaboratorSection ? (
+          <div className="grid gap-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">Collaborator playlists</h2>
+            </div>
+            {isCollaboratorSectionLoading ? (
+              <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+                <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading collaborator playlists...</p>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {collaboratorVotunaPlaylists.map((playlist) => (
+                  <Card
+                    key={playlist.id}
+                    className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-5 shadow-xl shadow-black/5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        <p className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">{playlist.title}</p>
+                        <p className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                          Shared via {playlist.provider}
+                        </p>
+                      </div>
+                      <Link
+                        href={`/playlists/${playlist.id}`}
+                        className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.15)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.7)]"
+                      >
+                        Open
+                      </Link>
+                    </div>
+                  </Card>
+                ))}
+                {pendingInvites.map((invite) => {
+                  const action = pendingInviteActions[invite.invite_id]
+                  const isAccepting = action === 'accept'
+                  const isDeclining = action === 'decline'
+                  return (
+                    <Card
+                      key={invite.invite_id}
+                      className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-5 shadow-xl shadow-black/5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">{invite.playlist_title}</p>
+                          <p className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                            Pending invite from {invite.owner_display_name || `User ${invite.owner_user_id}`}
+                          </p>
+                          <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.5)]">
+                            {invite.expires_at
+                              ? `Expires ${new Date(invite.expires_at).toLocaleDateString()}`
+                              : 'No expiry'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            onClick={() => acceptInviteMutation.mutate(invite.invite_id)}
+                            disabled={Boolean(action)}
+                            className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
+                          >
+                            {isAccepting ? 'Accepting...' : 'Accept'}
+                          </Button>
+                          <Button
+                            onClick={() => declineInviteMutation.mutate(invite.invite_id)}
+                            disabled={Boolean(action)}
+                            className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.16)] bg-transparent text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.95)]"
+                          >
+                            {isDeclining ? 'Declining...' : 'Decline'}
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+            {pendingInvitesErrorMessage ? <p className="text-xs text-rose-500">{pendingInvitesErrorMessage}</p> : null}
+          </div>
+        ) : null}
 
         <div className="grid gap-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">SoundCloud</h2>
+            <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">Your playlists</h2>
           </div>
 
-          {playlistsLoading ? (
+          {providerDashboardLoading ? (
             <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
               <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlists...</p>
             </Card>

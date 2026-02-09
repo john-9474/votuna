@@ -8,6 +8,7 @@ import { usePlaylistInteractions } from '@/lib/hooks/playlistDetail/usePlaylistI
 import { usePlaylistManagement } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
 import { usePlaylistPlayer } from '@/lib/hooks/playlistDetail/usePlaylistPlayer'
 import { usePlaylistInvites } from '@/lib/hooks/playlistDetail/usePlaylistInvites'
+import { usePlaylistMembers } from '@/lib/hooks/playlistDetail/usePlaylistMembers'
 import { usePlaylistSettings } from '@/lib/hooks/playlistDetail/usePlaylistSettings'
 import type {
   PlaylistMember,
@@ -153,6 +154,14 @@ export function usePlaylistDetailPage(
     queryClient,
   })
 
+  const memberActionsState = usePlaylistMembers({
+    playlistId,
+    currentUserId: currentUser?.id,
+    ownerUserId: playlist?.owner_user_id,
+    canManageMembers: canEditSettings,
+    queryClient,
+  })
+
   return {
     playlist,
     isPlaylistLoading: playlistQuery.isLoading,
@@ -173,6 +182,7 @@ export function usePlaylistDetailPage(
     ...interactionState,
     ...playerState,
     invites: inviteState,
+    memberActions: memberActionsState,
     management: managementState,
   }
 }

@@ -249,6 +249,7 @@ export default function PlaylistDetailPage() {
               members={state.members}
               isLoading={state.isMembersLoading}
               invites={state.invites}
+              memberActions={state.memberActions}
             />
           </div>
         ) : null}

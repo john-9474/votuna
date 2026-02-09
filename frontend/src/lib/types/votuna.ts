@@ -248,3 +248,15 @@ export type PlaylistInvite = {
   created_at: string
   updated_at: string
 }
+
+export type PendingInvite = {
+  invite_id: number
+  playlist_id: number
+  playlist_title: string
+  playlist_image_url?: string | null
+  playlist_provider: string
+  owner_user_id: number
+  owner_display_name?: string | null
+  created_at: string
+  expires_at?: string | null
+}

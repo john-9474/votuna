@@ -5,6 +5,7 @@ export const queryKeys = {
   providerPlaylistsByProvider: (provider: string) =>
     ['providerPlaylists', provider] as const,
   votunaPlaylists: ['votunaPlaylists'] as const,
+  votunaPendingInvites: ['votunaPendingInvites'] as const,
   votunaPlaylist: (playlistId: string | undefined) =>
     ['votunaPlaylist', playlistId] as const,
   votunaSuggestions: (playlistId: string | undefined) =>

@@ -19,8 +19,10 @@ from app.crud.votuna_playlist_invite import votuna_playlist_invite_crud
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.db.session import get_db
 from app.models.user import User
+from app.models.votuna_playlist import VotunaPlaylist
 from app.schemas.votuna_invite import (
     VotunaInviteCandidateOut,
+    VotunaPendingInviteOut,
     VotunaPlaylistInviteCreate,
     VotunaPlaylistInviteCreateLink,
     VotunaPlaylistInviteCreateUser,
@@ -28,7 +30,12 @@ from app.schemas.votuna_invite import (
 )
 from app.schemas.votuna_playlist import VotunaPlaylistOut
 from app.services.music_providers import ProviderAPIError, ProviderAuthError
-from app.services.votuna_invites import ensure_invite_is_active, join_invite, join_invite_by_token
+from app.services.votuna_invites import (
+    ensure_invite_is_active,
+    ensure_targeted_invite_matches_user,
+    join_invite,
+    join_invite_by_token,
+)
 
 router = APIRouter()
 
@@ -72,6 +79,19 @@ def _to_invite_out(
     payload.target_avatar_url = target_avatar_url
     payload.target_profile_url = target_profile_url
     return payload
+
+
+def _display_name(user: User | None) -> str | None:
+    if not user:
+        return None
+    return user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
+
+
+def _get_targeted_invite_or_404(db: Session, invite_id: int):
+    invite = votuna_playlist_invite_crud.get(db, invite_id)
+    if not invite or invite.invite_type != "user":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invite not found")
+    return invite
 
 
 @router.get(
@@ -225,6 +245,53 @@ async def list_playlist_invites(
             )
         )
     return payloads
+
+
+@router.get("/invites/pending", response_model=list[VotunaPendingInviteOut])
+def list_pending_invites(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List actionable targeted invites for the current user."""
+    invites = votuna_playlist_invite_crud.list_pending_user_invites_for_identity(
+        db=db,
+        auth_provider=current_user.auth_provider,
+        provider_user_id=current_user.provider_user_id,
+        user_id=current_user.id,
+    )
+    playlist_cache: dict[int, VotunaPlaylist | None] = {}
+    owner_cache: dict[int, User | None] = {}
+    payload: list[VotunaPendingInviteOut] = []
+    for invite in invites:
+        try:
+            ensure_invite_is_active(invite)
+        except HTTPException:
+            continue
+        if invite.playlist_id not in playlist_cache:
+            playlist = votuna_playlist_crud.get(db, invite.playlist_id)
+            playlist_cache[invite.playlist_id] = playlist
+        playlist = playlist_cache[invite.playlist_id]
+        if not playlist:
+            continue
+        owner_user_id = playlist.owner_user_id
+        if owner_user_id not in owner_cache:
+            owner = user_crud.get(db, owner_user_id)
+            owner_cache[owner_user_id] = owner
+        owner = owner_cache[owner_user_id]
+        payload.append(
+            VotunaPendingInviteOut(
+                invite_id=invite.id,
+                playlist_id=invite.playlist_id,
+                playlist_title=playlist.title,
+                playlist_image_url=playlist.image_url,
+                playlist_provider=playlist.provider,
+                owner_user_id=owner_user_id,
+                owner_display_name=_display_name(owner),
+                created_at=invite.created_at,
+                expires_at=invite.expires_at,
+            )
+        )
+    return payload
 
 
 @router.delete("/playlists/{playlist_id}/invites/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -382,6 +449,33 @@ async def create_invite(
         },
     )
     return _to_invite_out(invite, invite_url=_build_invite_url(request, invite.token))
+
+
+@router.post("/invites/{invite_id}/accept", response_model=VotunaPlaylistOut)
+def accept_pending_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Accept one pending targeted invite and join the playlist."""
+    invite = _get_targeted_invite_or_404(db, invite_id)
+    return join_invite(db, invite, current_user)
+
+
+@router.post("/invites/{invite_id}/decline", status_code=status.HTTP_204_NO_CONTENT)
+def decline_pending_invite(
+    invite_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Decline one pending targeted invite."""
+    invite = _get_targeted_invite_or_404(db, invite_id)
+    ensure_targeted_invite_matches_user(invite, current_user)
+    if invite.accepted_at is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invite already accepted")
+    ensure_invite_is_active(invite)
+    votuna_playlist_invite_crud.update(db, invite, {"is_revoked": True})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/invites/{token}/open")
