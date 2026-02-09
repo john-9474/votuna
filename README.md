@@ -162,10 +162,14 @@ Production deploys are handled by GitHub Actions from published GitHub Releases 
 Required GitHub repository secrets for release deploys:
 
 - `RAILWAY_TOKEN`
-- `RAILWAY_PROJECT_ID`
-- `RAILWAY_ENVIRONMENT_ID`
+- `RAILWAY_API_PROJECT_ID`
+- `RAILWAY_API_ENVIRONMENT_ID`
 - `RAILWAY_API_SERVICE_ID`
+- `RAILWAY_FRONTEND_PROJECT_ID`
+- `RAILWAY_FRONTEND_ENVIRONMENT_ID`
 - `RAILWAY_FRONTEND_SERVICE_ID`
+
+If API and frontend share the same Railway project/environment, set both API and frontend project/environment secrets to the same values.
 
 ### 1. Create services
 

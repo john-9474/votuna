@@ -73,8 +73,8 @@ jobs:
     needs: [backend-quality, frontend-quality]
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-      RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+      RAILWAY_API_PROJECT_ID: ${{ secrets.RAILWAY_API_PROJECT_ID }}
+      RAILWAY_API_ENVIRONMENT_ID: ${{ secrets.RAILWAY_API_ENVIRONMENT_ID }}
       RAILWAY_API_SERVICE_ID: ${{ secrets.RAILWAY_API_SERVICE_ID }}
 
     steps:
@@ -91,7 +91,7 @@ jobs:
 
       - name: Deploy API service to Railway
         working-directory: api
-        run: railway --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID" --service "$RAILWAY_API_SERVICE_ID" up --detach --ci
+        run: railway --project "$RAILWAY_API_PROJECT_ID" --environment "$RAILWAY_API_ENVIRONMENT_ID" --service "$RAILWAY_API_SERVICE_ID" up --detach --ci
 
   deploy-frontend:
     name: deploy-frontend
@@ -100,8 +100,8 @@ jobs:
     needs: [backend-quality, frontend-quality]
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-      RAILWAY_ENVIRONMENT_ID: ${{ secrets.RAILWAY_ENVIRONMENT_ID }}
+      RAILWAY_FRONTEND_PROJECT_ID: ${{ secrets.RAILWAY_FRONTEND_PROJECT_ID }}
+      RAILWAY_FRONTEND_ENVIRONMENT_ID: ${{ secrets.RAILWAY_FRONTEND_ENVIRONMENT_ID }}
       RAILWAY_FRONTEND_SERVICE_ID: ${{ secrets.RAILWAY_FRONTEND_SERVICE_ID }}
 
     steps:
@@ -118,4 +118,4 @@ jobs:
 
       - name: Deploy frontend service to Railway
         working-directory: frontend
-        run: railway --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID" --service "$RAILWAY_FRONTEND_SERVICE_ID" up --detach --ci
+        run: railway --project "$RAILWAY_FRONTEND_PROJECT_ID" --environment "$RAILWAY_FRONTEND_ENVIRONMENT_ID" --service "$RAILWAY_FRONTEND_SERVICE_ID" up --detach --ci
