@@ -148,8 +148,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ### Architecture
 
 - `postgres`: Railway PostgreSQL service
-- `api`: public FastAPI service (root directory: `/api`, config: `/api/railway.toml`)
-- `frontend`: public Next.js service (root directory: `/frontend`, config: `/frontend/railway.toml`)
+- `api`: public FastAPI service (root directory: `api`, config: `api/railway.toml`)
+- `frontend`: public Next.js service (root directory: `frontend`, config: `frontend/railway.toml`)
 
 ### Release-only deployment policy
 
@@ -177,6 +177,7 @@ If API and frontend share the same Railway project/environment, set both API and
 2. Add `Postgres` from Railway templates.
 3. Add `api` service from this repo with root directory `api`.
 4. Add `frontend` service from this repo with root directory `frontend`.
+   - Do not prefix these with `/` in Railway. Use `api` and `frontend`, not `/api` or `/frontend`.
 
 ### 2. Configure API variables
 

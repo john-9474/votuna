@@ -90,8 +90,7 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy API service to Railway
-        working-directory: api
-        run: railway up --project "$RAILWAY_API_PROJECT_ID" --environment "$RAILWAY_API_ENVIRONMENT_ID" --service "$RAILWAY_API_SERVICE_ID" --detach --ci
+        run: railway up . --project "$RAILWAY_API_PROJECT_ID" --environment "$RAILWAY_API_ENVIRONMENT_ID" --service "$RAILWAY_API_SERVICE_ID" --detach --ci
 
   deploy-frontend:
     name: deploy-frontend
@@ -117,5 +116,4 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy frontend service to Railway
-        working-directory: frontend
-        run: railway up --project "$RAILWAY_FRONTEND_PROJECT_ID" --environment "$RAILWAY_FRONTEND_ENVIRONMENT_ID" --service "$RAILWAY_FRONTEND_SERVICE_ID" --detach --ci
+        run: railway up . --project "$RAILWAY_FRONTEND_PROJECT_ID" --environment "$RAILWAY_FRONTEND_ENVIRONMENT_ID" --service "$RAILWAY_FRONTEND_SERVICE_ID" --detach --ci
