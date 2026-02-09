@@ -55,7 +55,7 @@ export default function NowPlayingDock({ track, onClose }: NowPlayingDockProps) 
         <iframe
           title={`Now playing ${track.title}`}
           src={buildSoundcloudEmbedUrl(track.url, true)}
-          className="mt-3 h-24 w-full rounded-xl border-0"
+          className="mt-3 h-[7rem] w-full rounded-xl border-0"
           loading="lazy"
           allow="autoplay"
         />
