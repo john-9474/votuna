@@ -1,4 +1,5 @@
 """Base CRUD operations for database models"""
+
 from typing import TypeVar, Generic, Type, Optional, List, Any, Union, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -7,9 +8,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ModelType = TypeVar('ModelType')
-CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
-UpdateSchemaType = TypeVar('UpdateSchemaType', bound=BaseModel)
+ModelType = TypeVar("ModelType")
+CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 
 class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
@@ -54,12 +55,7 @@ class BaseCRUD(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             logger.error(f"Error creating {self.model.__name__}: {e}")
             raise
 
-    def update(
-        self,
-        db: Session,
-        db_obj: ModelType,
-        obj_in: Union[UpdateSchemaType, Dict[str, Any]]
-    ) -> ModelType:
+    def update(self, db: Session, db_obj: ModelType, obj_in: Union[UpdateSchemaType, Dict[str, Any]]) -> ModelType:
         """Update an existing record"""
         try:
             # Handle both Pydantic models and dicts for backwards compatibility

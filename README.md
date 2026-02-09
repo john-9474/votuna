@@ -151,6 +151,22 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 - `api`: public FastAPI service (root directory: `/api`, config: `/api/railway.toml`)
 - `frontend`: public Next.js service (root directory: `/frontend`, config: `/frontend/railway.toml`)
 
+### Release-only deployment policy
+
+Production deploys are handled by GitHub Actions from published GitHub Releases (non-prerelease).
+
+1. Disable automatic deploys from GitHub pushes in Railway for both `api` and `frontend`.
+2. Keep Railway connected to the repo for build context, but do not allow push-triggered deploys.
+3. Deploy production by publishing a GitHub Release.
+
+Required GitHub repository secrets for release deploys:
+
+- `RAILWAY_TOKEN`
+- `RAILWAY_PROJECT_ID`
+- `RAILWAY_ENVIRONMENT_ID`
+- `RAILWAY_API_SERVICE_ID`
+- `RAILWAY_FRONTEND_SERVICE_ID`
+
 ### 1. Create services
 
 1. Create a Railway project.
@@ -199,6 +215,9 @@ This keeps uploaded avatar files across deploys.
 5. In SoundCloud developer settings, set callback URL to:
    - `https://<api-domain>.up.railway.app/api/v1/auth/callback/soundcloud`
 6. Ensure `SOUNDCLOUD_REDIRECT_URI` matches exactly, then redeploy `api`.
+7. After bootstrap, use GitHub Releases for production deploys:
+   - Publish a non-prerelease GitHub Release.
+   - GitHub Actions runs quality checks, then deploys both Railway services.
 
 ### 6. Smoke test checklist
 
@@ -233,6 +252,8 @@ Backend:
 
 ```bash
 cd api
+python -m ruff check main.py app tests
+python -m black --check main.py app tests
 pytest -q
 ```
 

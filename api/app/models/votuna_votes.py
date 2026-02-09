@@ -1,4 +1,5 @@
 """Votuna track vote models"""
+
 from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 

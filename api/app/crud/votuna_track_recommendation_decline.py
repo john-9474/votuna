@@ -1,4 +1,5 @@
 """CRUD helpers for recommendation decline records."""
+
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
@@ -8,9 +9,7 @@ from app.crud.base import BaseCRUD
 from app.models.votuna_track_recommendation_declines import VotunaTrackRecommendationDecline
 
 
-class VotunaTrackRecommendationDeclineCRUD(
-    BaseCRUD[VotunaTrackRecommendationDecline, dict, dict]
-):
+class VotunaTrackRecommendationDeclineCRUD(BaseCRUD[VotunaTrackRecommendationDecline, dict, dict]):
     def list_declined_track_ids(
         self,
         db: Session,
@@ -77,6 +76,4 @@ class VotunaTrackRecommendationDeclineCRUD(
             return self.update(db, conflict, {"declined_at": declined_at})
 
 
-votuna_track_recommendation_decline_crud = VotunaTrackRecommendationDeclineCRUD(
-    VotunaTrackRecommendationDecline
-)
+votuna_track_recommendation_decline_crud = VotunaTrackRecommendationDeclineCRUD(VotunaTrackRecommendationDecline)

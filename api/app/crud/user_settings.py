@@ -1,4 +1,5 @@
 """User settings CRUD helpers"""
+
 from typing import Any, Optional
 from sqlalchemy.orm import Session
 

@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    @field_validator('ALLOWED_ORIGINS', mode='before')
+    @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_allowed_origins(cls, v: Any) -> List[str]:
         """Parse allowed origins from JSON or a comma-delimited string."""
@@ -47,20 +47,20 @@ class Settings(BaseSettings):
                 return json.loads(v)
             except (json.JSONDecodeError, TypeError):
                 # If not valid JSON, try splitting by comma
-                return [origin.strip() for origin in v.split(',')]
+                return [origin.strip() for origin in v.split(",")]
         return v
 
-    @field_validator('DATABASE_URL')
+    @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
         """Validate that the database URL is present and uses PostgreSQL."""
         if not v:
             raise ValueError("DATABASE_URL must be set")
-        if not v.startswith(('postgresql://', 'postgresql+psycopg2://', 'postgresql+asyncpg://')):
+        if not v.startswith(("postgresql://", "postgresql+psycopg2://", "postgresql+asyncpg://")):
             raise ValueError("DATABASE_URL must be a valid PostgreSQL URL")
         return v
 
-    @field_validator('AUTH_COOKIE_SAMESITE', mode='before')
+    @field_validator("AUTH_COOKIE_SAMESITE", mode="before")
     @classmethod
     def validate_cookie_samesite(cls, v: Any) -> Literal["lax", "strict", "none"]:
         """Normalize and validate the cookie samesite setting."""

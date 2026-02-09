@@ -1,4 +1,5 @@
 """Votuna track vote CRUD helpers"""
+
 from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD
@@ -45,11 +46,7 @@ class VotunaTrackVoteCRUD(BaseCRUD[VotunaTrackVote, dict, dict]):
 
     def count_reactions(self, db: Session, suggestion_id: int) -> dict[str, int]:
         """Return up/down/total reaction counts for the suggestion."""
-        rows = (
-            db.query(VotunaTrackVote.reaction)
-            .filter(VotunaTrackVote.suggestion_id == suggestion_id)
-            .all()
-        )
+        rows = db.query(VotunaTrackVote.reaction).filter(VotunaTrackVote.suggestion_id == suggestion_id).all()
         upvotes = 0
         downvotes = 0
         for (reaction,) in rows:
@@ -90,11 +87,7 @@ class VotunaTrackVoteCRUD(BaseCRUD[VotunaTrackVote, dict, dict]):
         names: list[str] = []
         for user, _vote in voters:
             display_name = (
-                user.display_name
-                or user.first_name
-                or user.email
-                or user.provider_user_id
-                or f"User {user.id}"
+                user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
             )
             names.append(display_name)
         return names

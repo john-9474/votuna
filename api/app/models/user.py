@@ -1,4 +1,5 @@
 """User model"""
+
 from sqlalchemy import Column, String, Boolean, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 
@@ -7,6 +8,7 @@ from app.models.base import BaseModel
 
 class User(BaseModel):
     """Application user authenticated via SSO providers"""
+
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("auth_provider", "provider_user_id", name="uq_users_provider_user_id"),)
 

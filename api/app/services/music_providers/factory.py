@@ -1,4 +1,5 @@
 """Factory for music provider clients."""
+
 from app.services.music_providers.base import MusicProviderClient
 from app.services.music_providers.soundcloud import SoundcloudProvider
 

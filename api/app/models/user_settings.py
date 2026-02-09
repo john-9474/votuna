@@ -1,4 +1,5 @@
 """User settings model"""
+
 from sqlalchemy import Column, Integer, Boolean, String, ForeignKey
 from sqlalchemy.orm import relationship
 
@@ -7,6 +8,7 @@ from app.models.base import BaseModel
 
 class UserSettings(BaseModel):
     """Per-user settings"""
+
     __tablename__ = "user_settings"
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)

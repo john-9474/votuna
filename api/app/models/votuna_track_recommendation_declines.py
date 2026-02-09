@@ -1,4 +1,5 @@
 """Per-user declined recommendation records for Votuna playlists."""
+
 from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 

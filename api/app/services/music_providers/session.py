@@ -1,4 +1,5 @@
 """Provider session helpers for user-scoped API clients."""
+
 from __future__ import annotations
 
 import inspect

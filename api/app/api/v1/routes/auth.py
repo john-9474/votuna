@@ -1,4 +1,5 @@
 """Auth routes"""
+
 from datetime import datetime, timezone
 from typing import Any, Mapping, cast
 from urllib.parse import quote
@@ -172,19 +173,13 @@ async def callback_provider(
             },
         )
         avatar_needs_refresh = (
-            not user.avatar_url
-            or str(user.avatar_url).startswith("http")
-            or not _local_avatar_exists(user.avatar_url)
+            not user.avatar_url or str(user.avatar_url).startswith("http") or not _local_avatar_exists(user.avatar_url)
         )
         if provider_avatar_url and avatar_needs_refresh:
             previous_avatar = user.avatar_url
             stored_avatar = await save_avatar_from_url(str(provider_avatar_url), user.id)
             if stored_avatar:
-                if (
-                    previous_avatar
-                    and not str(previous_avatar).startswith("http")
-                    and previous_avatar != stored_avatar
-                ):
+                if previous_avatar and not str(previous_avatar).startswith("http") and previous_avatar != stored_avatar:
                     delete_avatar_if_exists(str(previous_avatar))
                 user = user_crud.update(db, user, {"avatar_url": stored_avatar})
             elif not previous_avatar or not _local_avatar_exists(str(previous_avatar)):

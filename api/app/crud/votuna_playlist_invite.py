@@ -1,4 +1,5 @@
 """Votuna playlist invite CRUD helpers"""
+
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import or_

@@ -1,4 +1,5 @@
 """Votuna track addition provenance CRUD helpers."""
+
 from sqlalchemy.orm import Session
 
 from app.crud.base import BaseCRUD

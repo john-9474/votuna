@@ -1,4 +1,5 @@
 """SoundCloud provider integration."""
+
 from typing import Any, Sequence
 from urllib.parse import urlparse
 import httpx
@@ -485,11 +486,7 @@ class SoundcloudProvider(MusicProviderClient):
             self._raise_for_status(response)
             payload = response.json()
             existing_tracks = payload.get("tracks", []) or []
-            kept_tracks = [
-                track
-                for track in existing_tracks
-                if str(track.get("id")) not in remove_ids
-            ]
+            kept_tracks = [track for track in existing_tracks if str(track.get("id")) not in remove_ids]
             update_payload = {
                 "playlist": {
                     "title": payload.get("title") or "Untitled",

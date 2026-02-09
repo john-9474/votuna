@@ -1,4 +1,5 @@
 """Votuna playlist member CRUD helpers"""
+
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -21,11 +22,7 @@ class VotunaPlaylistMemberCRUD(BaseCRUD[VotunaPlaylistMember, dict, dict]):
 
     def count_members(self, db: Session, playlist_id: int) -> int:
         """Count members for the playlist."""
-        return (
-            db.query(VotunaPlaylistMember)
-            .filter(VotunaPlaylistMember.playlist_id == playlist_id)
-            .count()
-        )
+        return db.query(VotunaPlaylistMember).filter(VotunaPlaylistMember.playlist_id == playlist_id).count()
 
     def count_non_owner_members(self, db: Session, playlist_id: int, owner_user_id: int) -> int:
         """Count collaborators excluding the owner."""
@@ -42,9 +39,7 @@ class VotunaPlaylistMemberCRUD(BaseCRUD[VotunaPlaylistMember, dict, dict]):
         """Return whether the playlist currently has collaborators."""
         return self.count_non_owner_members(db, playlist_id, owner_user_id) > 0
 
-    def list_members(
-        self, db: Session, playlist_id: int
-    ) -> list[tuple[VotunaPlaylistMember, User]]:
+    def list_members(self, db: Session, playlist_id: int) -> list[tuple[VotunaPlaylistMember, User]]:
         """List members with user data for the playlist."""
         return (
             db.query(VotunaPlaylistMember, User)

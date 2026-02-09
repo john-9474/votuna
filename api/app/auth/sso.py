@@ -1,4 +1,5 @@
 """Generic SSO helpers for multiple providers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

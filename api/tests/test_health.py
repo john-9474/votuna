@@ -1,4 +1,3 @@
-
 def test_root(client):
     """Ensure the root endpoint returns the welcome payload."""
     response = client.get("/")

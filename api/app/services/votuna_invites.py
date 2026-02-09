@@ -1,4 +1,5 @@
 """Shared invite helpers for Votuna invite flows."""
+
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
@@ -102,4 +103,3 @@ def auto_accept_pending_targeted_invites(db: Session, user: User) -> list[int]:
             # Keep login resilient even if one pending invite is invalid.
             continue
     return joined_playlist_ids
-

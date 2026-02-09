@@ -1,4 +1,5 @@
 """Compatibility exports for Votuna models."""
+
 from app.models.votuna_playlist import VotunaPlaylist
 from app.models.votuna_playlist_settings import VotunaPlaylistSettings
 from app.models.votuna_members import VotunaPlaylistMember

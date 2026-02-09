@@ -1,4 +1,5 @@
 """Playlist management routes for import/export workflows."""
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Iterable, Sequence
@@ -141,10 +142,7 @@ def _build_facet_counts(values: Iterable[str | None]) -> list[ManagementFacetCou
         if normalized not in display_values:
             display_values[normalized] = value
 
-    facets = [
-        ManagementFacetCount(value=display_values[key], count=counts[key])
-        for key in counts
-    ]
+    facets = [ManagementFacetCount(value=display_values[key], count=counts[key]) for key in counts]
     facets.sort(key=lambda facet: (-facet.count, facet.value.lower(), facet.value))
     return facets[:FACETS_LIMIT]
 
@@ -161,18 +159,10 @@ def _filter_tracks_by_selection(
         return [track for track in tracks if _normalize(track.provider_track_id) in selected_ids]
     if selection_mode == "artist":
         selected_artists = set(cleaned_values)
-        return [
-            track
-            for track in tracks
-            if track.artist and _normalize(track.artist) in selected_artists
-        ]
+        return [track for track in tracks if track.artist and _normalize(track.artist) in selected_artists]
     # selection_mode == "genre"
     selected_genres = set(cleaned_values)
-    return [
-        track
-        for track in tracks
-        if track.genre and _normalize(track.genre) in selected_genres
-    ]
+    return [track for track in tracks if track.genre and _normalize(track.genre) in selected_genres]
 
 
 def _dedupe_tracks_by_id(tracks: Sequence[ProviderTrack]) -> list[ProviderTrack]:
@@ -455,16 +445,10 @@ async def preview_management_transfer(
             current_user=current_user,
             owner_id=current_playlist.owner_user_id,
         )
-        destination_track_ids = {
-            track.provider_track_id for track in destination_tracks if track.provider_track_id
-        }
+        destination_track_ids = {track.provider_track_id for track in destination_tracks if track.provider_track_id}
 
-    duplicate_tracks = [
-        track for track in matched_tracks if track.provider_track_id in destination_track_ids
-    ]
-    to_add_tracks = [
-        track for track in matched_tracks if track.provider_track_id not in destination_track_ids
-    ]
+    duplicate_tracks = [track for track in matched_tracks if track.provider_track_id in destination_track_ids]
+    to_add_tracks = [track for track in matched_tracks if track.provider_track_id not in destination_track_ids]
 
     if len(to_add_tracks) > MAX_TRACKS_PER_ACTION:
         raise HTTPException(
@@ -548,17 +532,11 @@ async def execute_management_transfer(
             current_user=current_user,
             owner_id=current_playlist.owner_user_id,
         )
-        destination_track_ids = {
-            track.provider_track_id for track in destination_tracks if track.provider_track_id
-        }
+        destination_track_ids = {track.provider_track_id for track in destination_tracks if track.provider_track_id}
 
-    duplicate_tracks = [
-        track for track in matched_tracks if track.provider_track_id in destination_track_ids
-    ]
+    duplicate_tracks = [track for track in matched_tracks if track.provider_track_id in destination_track_ids]
     to_add_track_ids = [
-        track.provider_track_id
-        for track in matched_tracks
-        if track.provider_track_id not in destination_track_ids
+        track.provider_track_id for track in matched_tracks if track.provider_track_id not in destination_track_ids
     ]
 
     if len(to_add_track_ids) > MAX_TRACKS_PER_ACTION:
@@ -595,13 +573,9 @@ async def execute_management_transfer(
                 raise_provider_auth(current_user, owner_id=current_playlist.owner_user_id)
                 raise AssertionError("unreachable")
             except ProviderAPIError as exc:
-                failed_items.append(
-                    ManagementFailedItem(provider_track_id=track_id, error=str(exc))
-                )
+                failed_items.append(ManagementFailedItem(provider_track_id=track_id, error=str(exc)))
             except Exception as exc:  # pragma: no cover - defensive fallback
-                failed_items.append(
-                    ManagementFailedItem(provider_track_id=track_id, error=str(exc))
-                )
+                failed_items.append(ManagementFailedItem(provider_track_id=track_id, error=str(exc)))
 
     if successfully_added_track_ids:
         destination_playlists = (

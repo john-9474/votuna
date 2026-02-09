@@ -173,7 +173,9 @@ def test_list_votuna_tracks_includes_suggester(auth_client, db_session, votuna_p
     assert data[0]["suggested_by_display_name"] == "You"
 
 
-def test_list_votuna_tracks_uses_playlist_utils_provenance(auth_client, db_session, votuna_playlist, user, provider_stub):
+def test_list_votuna_tracks_uses_playlist_utils_provenance(
+    auth_client, db_session, votuna_playlist, user, provider_stub
+):
     votuna_track_addition_crud.create(
         db_session,
         {

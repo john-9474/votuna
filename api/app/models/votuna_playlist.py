@@ -1,4 +1,5 @@
 """Votuna playlist models"""
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
@@ -54,5 +55,3 @@ class VotunaPlaylist(BaseModel):
         back_populates="playlist",
         cascade="all, delete-orphan",
     )
-
-

@@ -1,10 +1,12 @@
 """Base model class for all database models"""
+
 from sqlalchemy import Column, Integer, DateTime, func
 from app.db.session import Base
 
 
 class BaseModel(Base):
     """Base model with common fields for all database models"""
+
     __abstract__ = True
 
     id = Column(Integer, primary_key=True, index=True)

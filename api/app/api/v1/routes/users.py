@@ -1,4 +1,5 @@
 """User routes"""
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session

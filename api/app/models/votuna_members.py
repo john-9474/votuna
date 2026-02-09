@@ -1,4 +1,5 @@
 """Votuna playlist member models"""
+
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 

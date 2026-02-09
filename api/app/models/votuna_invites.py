@@ -1,4 +1,5 @@
 """Votuna playlist invite models"""
+
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 

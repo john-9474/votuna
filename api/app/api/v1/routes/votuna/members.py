@@ -1,4 +1,5 @@
 """Votuna member routes."""
+
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends

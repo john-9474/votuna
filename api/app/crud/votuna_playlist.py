@@ -1,4 +1,5 @@
 """Votuna playlist CRUD helpers"""
+
 from typing import Optional, Sequence
 from sqlalchemy.orm import Session
 from sqlalchemy import or_

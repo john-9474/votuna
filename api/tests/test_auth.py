@@ -1,4 +1,3 @@
-import pytest
 from fastapi.responses import RedirectResponse
 
 from app.config.settings import settings

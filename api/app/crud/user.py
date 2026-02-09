@@ -1,4 +1,5 @@
 """User CRUD helpers"""
+
 from typing import Any, Optional
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -10,11 +11,7 @@ from app.models.user import User
 class UserCRUD(BaseCRUD[User, dict[str, Any], dict[str, Any]]):
     def get_by_provider_id(self, db: Session, provider: str, provider_user_id: str) -> Optional[User]:
         """Return a user by provider and provider user id."""
-        return (
-            db.query(User)
-            .filter(User.auth_provider == provider, User.provider_user_id == provider_user_id)
-            .first()
-        )
+        return db.query(User).filter(User.auth_provider == provider, User.provider_user_id == provider_user_id).first()
 
     def search_by_provider_identity(
         self,

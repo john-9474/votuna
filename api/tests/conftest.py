@@ -59,7 +59,7 @@ class DummyProvider:
             genre="UKG",
             artwork_url=None,
             url="https://soundcloud.com/test/track-2",
-        )
+        ),
     ]
     tracks_by_playlist_id = {
         "provider-1": [tracks[0]],
@@ -273,7 +273,7 @@ class DummyProvider:
         tracks = self.related_tracks_by_seed.get(seed_id, [])
         safe_offset = max(0, int(offset))
         safe_limit = max(1, int(limit))
-        return tracks[safe_offset:safe_offset + safe_limit]
+        return tracks[safe_offset : safe_offset + safe_limit]
 
     async def search_playlists(self, query: str, limit: int = 10):
         if not query.strip():
@@ -309,9 +309,7 @@ class DummyProvider:
 
     async def add_tracks(self, provider_playlist_id: str, track_ids):
         normalized_ids = [str(track_id) for track_id in track_ids]
-        self.add_tracks_calls.append(
-            {"provider_playlist_id": provider_playlist_id, "track_ids": normalized_ids}
-        )
+        self.add_tracks_calls.append({"provider_playlist_id": provider_playlist_id, "track_ids": normalized_ids})
         if len(normalized_ids) > 1 and any(
             track_id in self.fail_add_chunk_for_track_ids for track_id in normalized_ids
         ):
@@ -354,14 +352,13 @@ class DummyProvider:
         normalized_remove_ids = {str(track_id) for track_id in track_ids}
         playlist_tracks = self.tracks_by_playlist_id.setdefault(provider_playlist_id, [])
         self.tracks_by_playlist_id[provider_playlist_id] = [
-            track
-            for track in playlist_tracks
-            if str(track.provider_track_id) not in normalized_remove_ids
+            track for track in playlist_tracks if str(track.provider_track_id) not in normalized_remove_ids
         ]
         return None
 
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         return self.track_exists_value
+
 
 TEST_DATABASE_URL = "sqlite+pysqlite://"
 
@@ -397,6 +394,7 @@ def db_session(test_engine):
 @pytest.fixture()
 def client(db_session):
     """Provide a TestClient with the DB dependency overridden."""
+
     def _override_get_db():
         """Yield the test session for dependency overrides."""
         try:

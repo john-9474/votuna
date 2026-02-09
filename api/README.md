@@ -121,5 +121,13 @@ uvicorn main:app --reload
 
 ```bash
 cd api
+python -m ruff check main.py app tests
+python -m black --check main.py app tests
 pytest -q
 ```
+
+## CI/CD automation
+
+- Pull requests and pushes to `main` run backend and frontend quality checks in GitHub Actions.
+- Release deploys run from published GitHub Releases (non-prerelease) and deploy to Railway using service/environment IDs from repository secrets.
+- Railway push-triggered auto-deploy should be disabled for `api` and `frontend` so production deploys are release-driven.

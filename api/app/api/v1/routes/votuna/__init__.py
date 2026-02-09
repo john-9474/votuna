@@ -1,4 +1,5 @@
 """Votuna route grouping."""
+
 from fastapi import APIRouter
 
 from app.api.v1.routes.votuna.playlists import router as playlists_router

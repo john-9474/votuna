@@ -1,4 +1,5 @@
 """Votuna invite routes."""
+
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
 from typing import Annotated
@@ -86,9 +87,7 @@ async def list_invite_candidates(
 ):
     """Search invite candidates: registered users first, then provider users fallback."""
     playlist = require_owner(db, playlist_id, current_user.id)
-    member_ids = {
-        member.user_id for member, _ in votuna_playlist_member_crud.list_members(db, playlist_id)
-    }
+    member_ids = {member.user_id for member, _ in votuna_playlist_member_crud.list_members(db, playlist_id)}
 
     local_candidates = user_crud.search_by_provider_identity(
         db=db,
@@ -172,11 +171,7 @@ async def list_playlist_invites(
     invites = votuna_playlist_invite_crud.list_active_for_playlist(db, playlist_id)
 
     user_invite_profile: dict[int, tuple[str | None, str | None, str | None, str | None]] = {}
-    user_invites = [
-        invite
-        for invite in invites
-        if invite.invite_type == "user" and invite.target_provider_user_id
-    ]
+    user_invites = [invite for invite in invites if invite.invite_type == "user" and invite.target_provider_user_id]
 
     if user_invites:
         client = None
@@ -218,9 +213,7 @@ async def list_playlist_invites(
         target_avatar_url = None
         target_profile_url = None
         if invite.id in user_invite_profile:
-            target_display_name, target_username, target_avatar_url, target_profile_url = user_invite_profile[
-                invite.id
-            ]
+            target_display_name, target_username, target_avatar_url, target_profile_url = user_invite_profile[invite.id]
         payloads.append(
             _to_invite_out(
                 invite,
@@ -276,10 +269,7 @@ async def create_invite(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="target_provider_user_id is required",
             )
-        if (
-            current_user.auth_provider == playlist.provider
-            and current_user.provider_user_id == target_provider_user_id
-        ):
+        if current_user.auth_provider == playlist.provider and current_user.provider_user_id == target_provider_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot invite yourself",
@@ -358,9 +348,7 @@ async def create_invite(
         )
         return _to_invite_out(
             invite,
-            target_display_name=provider_user.display_name
-            or provider_user.username
-            or target_provider_user_id,
+            target_display_name=provider_user.display_name or provider_user.username or target_provider_user_id,
             target_username=provider_user.username or target_provider_user_id,
             target_avatar_url=provider_user.avatar_url,
             target_profile_url=provider_user.profile_url
@@ -436,8 +424,7 @@ def open_invite_link(
 
     next_path = f"/playlists/{playlist.id}"
     login_url = (
-        f"/api/v1/auth/login/{auth_provider.value}"
-        f"?invite_token={quote(token)}&next={quote(next_path, safe='/')}"
+        f"/api/v1/auth/login/{auth_provider.value}" f"?invite_token={quote(token)}&next={quote(next_path, safe='/')}"
     )
     return RedirectResponse(url=login_url, status_code=status.HTTP_302_FOUND)
 

@@ -91,9 +91,7 @@ def test_cancel_invite_owner_success(auth_client, db_session, votuna_playlist):
         owner_user_id=votuna_playlist.owner_user_id,
         provider_user_id="provider-user-2",
     )
-    response = auth_client.delete(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/{invite.id}"
-    )
+    response = auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/{invite.id}")
     assert response.status_code == 204
     updated_invite = votuna_playlist_invite_crud.get(db_session, invite.id)
     assert updated_invite is not None
@@ -107,9 +105,7 @@ def test_cancel_invite_non_owner_forbidden(other_auth_client, db_session, votuna
         owner_user_id=votuna_playlist.owner_user_id,
         provider_user_id="provider-user-2",
     )
-    response = other_auth_client.delete(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/{invite.id}"
-    )
+    response = other_auth_client.delete(f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/{invite.id}")
     assert response.status_code == 403
 
 

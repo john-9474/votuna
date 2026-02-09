@@ -1,4 +1,5 @@
 """Base classes for music provider integrations."""
+
 from dataclasses import dataclass
 from typing import Sequence
 

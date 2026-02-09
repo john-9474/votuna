@@ -1,4 +1,5 @@
 """Votuna playlist routes."""
+
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
@@ -6,7 +7,6 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user
 from app.db.session import get_db
 from app.models.user import User
-from app.models.votuna_playlist import VotunaPlaylist
 from app.models.votuna_invites import VotunaPlaylistInvite
 from app.models.votuna_members import VotunaPlaylistMember
 from app.models.votuna_suggestions import VotunaTrackSuggestion
@@ -44,13 +44,7 @@ COLLABORATIVE_DIRECT_ADD_ERROR_CODE = "COLLABORATIVE_PLAYLIST_DIRECT_ADD_DISABLE
 
 
 def _display_name(user: User) -> str:
-    return (
-        user.display_name
-        or user.first_name
-        or user.email
-        or user.provider_user_id
-        or f"User {user.id}"
-    )
+    return user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
 
 
 @router.get("/playlists", response_model=list[VotunaPlaylistOut])
@@ -78,9 +72,7 @@ async def create_votuna_playlist(
     client = get_provider_client(payload.provider, current_user, db=db)
 
     if payload.provider_playlist_id:
-        existing = votuna_playlist_crud.get_by_provider_playlist_id(
-            db, payload.provider, payload.provider_playlist_id
-        )
+        existing = votuna_playlist_crud.get_by_provider_playlist_id(db, payload.provider, payload.provider_playlist_id)
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Playlist already enabled")
         try:
@@ -416,16 +408,12 @@ async def list_votuna_tracks(
             )
 
     addition_suggestion_ids = [
-        addition.suggestion_id
-        for addition in latest_additions_by_track.values()
-        if addition.suggestion_id is not None
+        addition.suggestion_id for addition in latest_additions_by_track.values() if addition.suggestion_id is not None
     ]
     suggestions_by_id: dict[int, VotunaTrackSuggestion] = {}
     if addition_suggestion_ids:
         suggestion_rows = (
-            db.query(VotunaTrackSuggestion)
-            .filter(VotunaTrackSuggestion.id.in_(addition_suggestion_ids))
-            .all()
+            db.query(VotunaTrackSuggestion).filter(VotunaTrackSuggestion.id.in_(addition_suggestion_ids)).all()
         )
         suggestions_by_id = {suggestion.id: suggestion for suggestion in suggestion_rows}
 
@@ -458,11 +446,7 @@ async def list_votuna_tracks(
                 else (
                     "Suggested by You"
                     if legacy_suggestion[0] == current_user.id
-                    else (
-                        "Suggested by a former member"
-                        if legacy_suggestion[0]
-                        else "Suggested via Votuna"
-                    )
+                    else ("Suggested by a former member" if legacy_suggestion[0] else "Suggested via Votuna")
                 )
             )
         else:
@@ -489,9 +473,7 @@ async def list_votuna_tracks(
             elif addition.source == "suggestion":
                 added_source = "votuna_suggestion"
                 suggestion = (
-                    suggestions_by_id.get(addition.suggestion_id)
-                    if addition.suggestion_id is not None
-                    else None
+                    suggestions_by_id.get(addition.suggestion_id) if addition.suggestion_id is not None else None
                 )
                 if suggestion:
                     suggested_by_user_id = suggestion.suggested_by_user_id
@@ -510,11 +492,7 @@ async def list_votuna_tracks(
                     else (
                         "Suggested by You"
                         if suggested_by_user_id == current_user.id
-                        else (
-                            "Suggested by a former member"
-                            if suggested_by_user_id
-                            else "Suggested via Votuna"
-                        )
+                        else ("Suggested by a former member" if suggested_by_user_id else "Suggested via Votuna")
                     )
                 )
 

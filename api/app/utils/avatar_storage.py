@@ -1,4 +1,5 @@
 """Helpers for storing and serving user avatar files."""
+
 from __future__ import annotations
 
 from pathlib import Path

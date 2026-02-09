@@ -1,4 +1,5 @@
 """Votuna suggestion routes."""
+
 from datetime import datetime, timezone
 import hashlib
 
@@ -46,13 +47,7 @@ RECOMMENDATION_MAX_TRACKS_PER_ARTIST = 2
 
 
 def _display_name(user: User) -> str:
-    return (
-        user.display_name
-        or user.first_name
-        or user.email
-        or user.provider_user_id
-        or f"User {user.id}"
-    )
+    return user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
 
 
 def _member_name_by_user_id(db: Session, playlist_id: int) -> dict[int, str]:
@@ -116,36 +111,21 @@ def _serialize_suggestion(
     reaction_by_user = votuna_track_vote_crud.get_reaction_by_user(db, suggestion.id)
     member_names = _member_name_by_user_id(db, suggestion.playlist_id)
     filtered_reactions = {
-        user_id: reaction
-        for user_id, reaction in reaction_by_user.items()
-        if user_id in member_names
+        user_id: reaction for user_id, reaction in reaction_by_user.items() if user_id in member_names
     }
     upvoter_display_names = [
-        member_names[user_id]
-        for user_id in member_names
-        if filtered_reactions.get(user_id) == "up"
+        member_names[user_id] for user_id in member_names if filtered_reactions.get(user_id) == "up"
     ]
     downvoter_display_names = [
-        member_names[user_id]
-        for user_id in member_names
-        if filtered_reactions.get(user_id) == "down"
+        member_names[user_id] for user_id in member_names if filtered_reactions.get(user_id) == "down"
     ]
     collaborators_left_to_vote_names = [
-        name
-        for user_id, name in member_names.items()
-        if user_id not in filtered_reactions
+        name for user_id, name in member_names.items() if user_id not in filtered_reactions
     ]
-    can_cancel = (
-        suggestion.status == "pending"
-        and (
-            current_user_id == suggestion.suggested_by_user_id
-            or current_user_id == playlist.owner_user_id
-        )
+    can_cancel = suggestion.status == "pending" and (
+        current_user_id == suggestion.suggested_by_user_id or current_user_id == playlist.owner_user_id
     )
-    can_force_add = (
-        suggestion.status == "pending"
-        and current_user_id == playlist.owner_user_id
-    )
+    can_force_add = suggestion.status == "pending" and current_user_id == playlist.owner_user_id
     return VotunaTrackSuggestionOut(
         id=suggestion.id,
         playlist_id=suggestion.playlist_id,
@@ -247,21 +227,12 @@ async def _resolve_if_all_collaborators_voted(
         return suggestion
 
     reactions_by_user = votuna_track_vote_crud.get_reaction_by_user(db, suggestion.id)
-    has_all_votes = all(
-        user_id in reactions_by_user
-        for user_id in eligible_voter_ids
-    )
+    has_all_votes = all(user_id in reactions_by_user for user_id in eligible_voter_ids)
     if not has_all_votes:
         return suggestion
 
-    upvotes = sum(
-        1 for user_id in eligible_voter_ids
-        if reactions_by_user.get(user_id) == "up"
-    )
-    downvotes = sum(
-        1 for user_id in eligible_voter_ids
-        if reactions_by_user.get(user_id) == "down"
-    )
+    upvotes = sum(1 for user_id in eligible_voter_ids if reactions_by_user.get(user_id) == "up")
+    downvotes = sum(1 for user_id in eligible_voter_ids if reactions_by_user.get(user_id) == "down")
 
     if upvotes == downvotes:
         if settings.tie_break_mode == "add":
@@ -309,10 +280,7 @@ def list_suggestions(
     playlist = get_playlist_or_404(db, playlist_id)
     require_member(db, playlist_id, current_user.id)
     suggestions = votuna_track_suggestion_crud.list_for_playlist(db, playlist_id, status)
-    return [
-        _serialize_suggestion(db, playlist, suggestion, current_user.id)
-        for suggestion in suggestions
-    ]
+    return [_serialize_suggestion(db, playlist, suggestion, current_user.id) for suggestion in suggestions]
 
 
 @router.get("/playlists/{playlist_id}/tracks/search", response_model=list[ProviderTrackOut])
@@ -377,9 +345,7 @@ async def list_recommended_tracks(
         return []
 
     existing_track_ids = {
-        (track.provider_track_id or "").strip()
-        for track in current_tracks
-        if (track.provider_track_id or "").strip()
+        (track.provider_track_id or "").strip() for track in current_tracks if (track.provider_track_id or "").strip()
     }
     pending_track_ids = {
         suggestion.provider_track_id
@@ -457,7 +423,7 @@ async def list_recommended_tracks(
     if not filtered_tracks:
         return []
 
-    page = filtered_tracks[offset:offset + limit]
+    page = filtered_tracks[offset : offset + limit]
     return [_serialize_provider_track(track) for track in page]
 
 
