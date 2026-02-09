@@ -173,6 +173,39 @@ def test_candidates_local_hit_does_not_call_provider(auth_client, db_session, vo
     assert provider_stub.search_users_calls == 0
 
 
+def test_candidates_local_hit_uses_registered_permalink_url(auth_client, db_session, votuna_playlist, provider_stub):
+    provider_user_id = f"permalink-{uuid.uuid4().hex}"
+    target = user_crud.create(
+        db_session,
+        {
+            "auth_provider": "soundcloud",
+            "provider_user_id": provider_user_id,
+            "email": "permalink@example.com",
+            "first_name": "Permalink",
+            "last_name": "User",
+            "display_name": "Permalink User",
+            "avatar_url": None,
+            "permalink_url": "https://soundcloud.com/john-thorlby-335768329",
+            "access_token": "token",
+            "refresh_token": None,
+            "token_expires_at": None,
+            "last_login_at": None,
+            "is_active": True,
+        },
+    )
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/candidates",
+        params={"q": provider_user_id, "limit": 10},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["source"] == "registered"
+    assert data[0]["registered_user_id"] == target.id
+    assert data[0]["profile_url"] == "https://soundcloud.com/john-thorlby-335768329"
+    assert provider_stub.search_users_calls == 0
+
+
 def test_candidates_local_hit_with_at_prefix(auth_client, db_session, votuna_playlist, provider_stub):
     local_handle = f"alpha-{uuid.uuid4().hex[:8]}"
     target = user_crud.create(

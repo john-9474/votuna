@@ -418,6 +418,7 @@ def _create_user(db_session, **overrides):
         "last_name": overrides.pop("last_name", "User"),
         "display_name": overrides.pop("display_name", "Test User"),
         "avatar_url": overrides.pop("avatar_url", None),
+        "permalink_url": overrides.pop("permalink_url", None),
         "access_token": overrides.pop("access_token", "token"),
         "refresh_token": overrides.pop("refresh_token", None),
         "token_expires_at": overrides.pop("token_expires_at", None),

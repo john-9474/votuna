@@ -1,7 +1,5 @@
 """Votuna member routes."""
 
-from urllib.parse import quote
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -15,15 +13,6 @@ from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.api.v1.routes.votuna.common import get_playlist_or_404, require_member, require_owner
 
 router = APIRouter()
-
-
-def _build_member_profile_url(user: User) -> str | None:
-    provider_user_id = (user.provider_user_id or "").strip()
-    if not provider_user_id:
-        return None
-    if user.auth_provider == "soundcloud":
-        return f"https://soundcloud.com/{quote(provider_user_id, safe='')}"
-    return None
 
 
 @router.get("/playlists/{playlist_id}/members", response_model=list[VotunaPlaylistMemberOut])
@@ -55,7 +44,7 @@ def list_votuna_members(
                 user_id=member.user_id,
                 display_name=display_name,
                 avatar_url=user.avatar_url,
-                profile_url=_build_member_profile_url(user),
+                profile_url=user.permalink_url,
                 role=member.role,
                 joined_at=member.joined_at,
                 suggested_count=int(counts.get(member.user_id, 0)),

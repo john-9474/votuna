@@ -1,5 +1,6 @@
 """Auth routes"""
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Mapping, cast
 from urllib.parse import quote
@@ -21,6 +22,7 @@ from app.config.settings import settings
 from app.crud.user import user_crud
 from app.crud.user_settings import user_settings_crud
 from app.db.session import get_db
+from app.services.music_providers import ProviderAPIError, ProviderAuthError, get_music_provider
 from app.services.votuna_invites import join_invite_by_token
 from app.utils.avatar_storage import (
     delete_avatar_if_exists,
@@ -30,6 +32,7 @@ from app.utils.avatar_storage import (
 from app.utils.token_expiry import coerce_expires_at, expires_at_from_payload
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 PENDING_INVITE_COOKIE = "votuna_pending_invite_token"
 PENDING_NEXT_COOKIE = "votuna_pending_next"
@@ -65,6 +68,28 @@ def _extract_sso_expires_at(sso: SSOProtocol) -> datetime | None:
             return expires_at
 
     return coerce_expires_at(getattr(oauth_client, "expires_at", None))
+
+
+async def _fetch_soundcloud_permalink_url(
+    access_token: str | None,
+    provider_user_id: str,
+) -> str | None:
+    token = (access_token or "").strip()
+    user_id = provider_user_id.strip()
+    if not token or not user_id:
+        return None
+    # SoundCloud user IDs are numeric; skip lookups for non-numeric ids to avoid bad requests.
+    if not user_id.isdigit():
+        return None
+    try:
+        provider = get_music_provider("soundcloud", token)
+        provider_user = await provider.get_user(user_id)
+    except (ProviderAuthError, ProviderAPIError):
+        return None
+    except Exception:
+        logger.exception("Failed to fetch SoundCloud permalink_url for user %s", user_id)
+        return None
+    return provider_user.profile_url
 
 
 @router.get("/login/{provider}")
@@ -139,6 +164,9 @@ async def callback_provider(
     provider_avatar_url = get_openid_value(openid, *provider_config.avatar_keys)
 
     provider_user_id_str = str(provider_user_id)
+    provider_permalink_url = None
+    if provider is AuthProvider.soundcloud:
+        provider_permalink_url = await _fetch_soundcloud_permalink_url(access_token, provider_user_id_str)
     user = user_crud.get_by_provider_id(db, provider.value, provider_user_id_str)
     if not user:
         user = user_crud.create(
@@ -151,6 +179,7 @@ async def callback_provider(
                 "last_name": last_name,
                 "display_name": display_name,
                 "avatar_url": None,
+                "permalink_url": provider_permalink_url,
                 "last_login_at": datetime.now(timezone.utc),
             },
         )
@@ -169,6 +198,7 @@ async def callback_provider(
                 "first_name": first_name or user.first_name,
                 "last_name": last_name or user.last_name,
                 "display_name": display_name or user.display_name,
+                "permalink_url": provider_permalink_url or user.permalink_url,
                 "last_login_at": datetime.now(timezone.utc),
             },
         )

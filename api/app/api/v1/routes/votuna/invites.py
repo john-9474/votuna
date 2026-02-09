@@ -87,6 +87,13 @@ def _display_name(user: User | None) -> str | None:
     return user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
 
 
+def _user_permalink_url(user: User | None) -> str | None:
+    if not user:
+        return None
+    permalink_url = (user.permalink_url or "").strip()
+    return permalink_url or None
+
+
 def _get_targeted_invite_or_404(db: Session, invite_id: int):
     invite = votuna_playlist_invite_crud.get(db, invite_id)
     if not invite or invite.invite_type != "user":
@@ -124,11 +131,7 @@ async def list_invite_candidates(
                 username=user.provider_user_id,
                 display_name=user.display_name or user.first_name or user.email,
                 avatar_url=user.avatar_url,
-                profile_url=_build_candidate_profile_url(
-                    playlist.provider,
-                    user.provider_user_id,
-                    user.provider_user_id,
-                ),
+                profile_url=_user_permalink_url(user),
                 is_registered=True,
                 registered_user_id=user.id,
             )
@@ -166,7 +169,8 @@ async def list_invite_candidates(
                 username=provider_user.username or provider_user_id,
                 display_name=provider_user.display_name or provider_user.username,
                 avatar_url=provider_user.avatar_url,
-                profile_url=provider_user.profile_url
+                profile_url=(_user_permalink_url(registered_user) if registered_user else None)
+                or provider_user.profile_url
                 or _build_candidate_profile_url(
                     playlist.provider,
                     provider_user_id,
@@ -191,6 +195,7 @@ async def list_playlist_invites(
     invites = votuna_playlist_invite_crud.list_active_for_playlist(db, playlist_id)
 
     user_invite_profile: dict[int, tuple[str | None, str | None, str | None, str | None]] = {}
+    user_cache: dict[int, User | None] = {}
     user_invites = [invite for invite in invites if invite.invite_type == "user" and invite.target_provider_user_id]
 
     if user_invites:
@@ -204,22 +209,27 @@ async def list_playlist_invites(
             handle = invite.target_username_snapshot or invite.target_provider_user_id
             display_name = None
             avatar_url = None
-            profile_url = _build_candidate_profile_url(
-                playlist.provider,
-                invite.target_provider_user_id or "",
-                handle,
-            )
+            target_user = None
+            if invite.target_user_id:
+                if invite.target_user_id not in user_cache:
+                    user_cache[invite.target_user_id] = user_crud.get(db, invite.target_user_id)
+                target_user = user_cache[invite.target_user_id]
+                if target_user:
+                    display_name = _display_name(target_user)
+                    avatar_url = target_user.avatar_url
+            profile_url = _user_permalink_url(target_user)
             if client and invite.target_provider_user_id:
                 try:
                     provider_user = await client.get_user(invite.target_provider_user_id)
                     handle = provider_user.username or handle
                     display_name = provider_user.display_name or handle
                     avatar_url = provider_user.avatar_url
-                    profile_url = provider_user.profile_url or _build_candidate_profile_url(
-                        playlist.provider,
-                        invite.target_provider_user_id,
-                        provider_user.username,
-                    )
+                    if not profile_url:
+                        profile_url = provider_user.profile_url or _build_candidate_profile_url(
+                            playlist.provider,
+                            invite.target_provider_user_id,
+                            provider_user.username,
+                        )
                 except (ProviderAuthError, ProviderAPIError, Exception):
                     pass
             if not display_name:
@@ -351,9 +361,13 @@ async def create_invite(
         if existing_invite:
             try:
                 ensure_invite_is_active(existing_invite)
+                target_user = (
+                    user_crud.get(db, existing_invite.target_user_id) if existing_invite.target_user_id else None
+                )
                 return _to_invite_out(
                     existing_invite,
-                    target_profile_url=_build_candidate_profile_url(
+                    target_profile_url=_user_permalink_url(target_user)
+                    or _build_candidate_profile_url(
                         playlist.provider,
                         existing_invite.target_provider_user_id or "",
                         existing_invite.target_username_snapshot,
@@ -418,7 +432,8 @@ async def create_invite(
             target_display_name=provider_user.display_name or provider_user.username or target_provider_user_id,
             target_username=provider_user.username or target_provider_user_id,
             target_avatar_url=provider_user.avatar_url,
-            target_profile_url=provider_user.profile_url
+            target_profile_url=_user_permalink_url(registered_target)
+            or provider_user.profile_url
             or _build_candidate_profile_url(
                 playlist.provider,
                 target_provider_user_id,

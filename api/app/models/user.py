@@ -19,6 +19,7 @@ class User(BaseModel):
     last_name = Column(String, nullable=True)
     display_name = Column(String, nullable=True)
     avatar_url = Column(String, nullable=True)
+    permalink_url = Column(String, nullable=True)
 
     access_token = Column(String, nullable=True)
     refresh_token = Column(String, nullable=True)

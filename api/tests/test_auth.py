@@ -4,6 +4,7 @@ from app.config.settings import settings
 from app.crud.user import user_crud
 from app.crud.votuna_playlist_invite import votuna_playlist_invite_crud
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
+from app.services.music_providers.base import ProviderUser
 
 
 class DummyOpenID:
@@ -46,6 +47,15 @@ class DummySSO:
         return None
 
 
+class DummyNumericOpenID(DummyOpenID):
+    id = "243633184"
+
+
+class DummyNumericSSO(DummySSO):
+    async def verify_and_process(self, request, **kwargs):
+        return DummyNumericOpenID()
+
+
 def test_login_redirect(client, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 
@@ -81,6 +91,30 @@ def test_callback_creates_user_and_sets_cookie(client, db_session, monkeypatch):
     user = user_crud.get_by_provider_id(db_session, "soundcloud", "sc-user")
     assert user is not None
     assert user.email == "user@example.com"
+
+
+def test_callback_soundcloud_syncs_permalink_url(client, db_session, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    class _Provider:
+        async def get_user(self, provider_user_id: str):
+            assert provider_user_id == "243633184"
+            return ProviderUser(
+                provider_user_id=provider_user_id,
+                username="john-thorlby-335768329",
+                display_name="John",
+                avatar_url=None,
+                profile_url="https://soundcloud.com/john-thorlby-335768329",
+            )
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummyNumericSSO())
+    monkeypatch.setattr(auth_routes, "get_music_provider", lambda provider, access_token: _Provider())
+    response = client.get("/api/v1/auth/callback/soundcloud", follow_redirects=False)
+    assert response.status_code in {302, 307}
+
+    user = user_crud.get_by_provider_id(db_session, "soundcloud", "243633184")
+    assert user is not None
+    assert user.permalink_url == "https://soundcloud.com/john-thorlby-335768329"
 
 
 def test_callback_auto_joins_invite_and_redirects_to_playlist(
