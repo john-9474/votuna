@@ -42,16 +42,85 @@ class SoundcloudProvider(MusicProviderClient):
                 status_code=status_code,
             ) from exc
 
-    def _to_provider_track(self, payload: Any) -> ProviderTrack | None:
+    @staticmethod
+    def _normalize_track_urn(value: str) -> str | None:
+        raw_value = value.strip()
+        if not raw_value:
+            return None
+        lowered = raw_value.lower()
+        if lowered.startswith("urn:soundcloud:tracks:"):
+            track_part = raw_value.split(":", 3)[-1].strip()
+            return f"urn:soundcloud:tracks:{track_part}" if track_part else None
+        if lowered.startswith("soundcloud:tracks:"):
+            track_part = raw_value.split(":", 2)[-1].strip()
+            return f"urn:soundcloud:tracks:{track_part}" if track_part else None
+        return None
+
+    @classmethod
+    def _normalize_track_id(cls, value: str) -> str | None:
+        raw_value = value.strip()
+        if not raw_value:
+            return None
+        normalized_urn = cls._normalize_track_urn(raw_value)
+        if normalized_urn:
+            return normalized_urn.rsplit(":", 1)[-1].strip() or None
+        if raw_value.startswith("http://") or raw_value.startswith("https://"):
+            parsed = urlparse(raw_value)
+            segments = [segment for segment in parsed.path.split("/") if segment]
+            if len(segments) >= 2 and segments[-2] == "tracks":
+                track_part = segments[-1].strip()
+                return track_part or None
+        return raw_value
+
+    @classmethod
+    def _track_reference_key(cls, value: str) -> str:
+        normalized_urn = cls._normalize_track_urn(value)
+        if normalized_urn:
+            return normalized_urn.rsplit(":", 1)[-1].strip().lower()
+        normalized_id = cls._normalize_track_id(value) or value.strip()
+        return normalized_id.lower()
+
+    @classmethod
+    def _build_track_reference(cls, value: str) -> tuple[dict[str, str], str] | None:
+        raw_value = value.strip()
+        if not raw_value:
+            return None
+        normalized_urn = cls._normalize_track_urn(raw_value)
+        if normalized_urn:
+            return {"urn": normalized_urn}, cls._track_reference_key(normalized_urn)
+        normalized_id = cls._normalize_track_id(raw_value)
+        if not normalized_id:
+            return None
+        return {"id": normalized_id}, cls._track_reference_key(normalized_id)
+
+    @classmethod
+    def _extract_track_reference_from_payload(cls, payload: Any) -> tuple[dict[str, str], str] | None:
         if not isinstance(payload, dict):
             return None
+        urn_value = payload.get("urn")
+        if isinstance(urn_value, str):
+            normalized_urn = cls._normalize_track_urn(urn_value)
+            if normalized_urn:
+                return {"urn": normalized_urn}, cls._track_reference_key(normalized_urn)
         track_id = payload.get("id")
         if track_id is None:
             return None
+        normalized_id = cls._normalize_track_id(str(track_id))
+        if not normalized_id:
+            return None
+        return {"id": normalized_id}, cls._track_reference_key(normalized_id)
+
+    def _to_provider_track(self, payload: Any) -> ProviderTrack | None:
+        if not isinstance(payload, dict):
+            return None
+        track_ref = self._extract_track_reference_from_payload(payload)
+        if not track_ref:
+            return None
+        track_id_value = track_ref[0]["urn"] if "urn" in track_ref[0] else track_ref[0]["id"]
         user_payload = payload.get("user")
         user = user_payload if isinstance(user_payload, dict) else {}
         return ProviderTrack(
-            provider_track_id=str(track_id),
+            provider_track_id=track_id_value,
             title=payload.get("title") or "Untitled",
             artist=user.get("username"),
             genre=payload.get("genre"),
@@ -452,17 +521,30 @@ class SoundcloudProvider(MusicProviderClient):
             self._raise_for_status(response)
             payload = response.json()
             existing_tracks = payload.get("tracks", []) or []
-            existing_ids = {str(track.get("id")) for track in existing_tracks if track.get("id") is not None}
-            for track_id in track_ids:
-                track_id_str = str(track_id)
-                if track_id_str in existing_ids:
+            existing_track_refs: list[dict[str, str]] = []
+            existing_keys: set[str] = set()
+            for track in existing_tracks:
+                reference = self._extract_track_reference_from_payload(track)
+                if not reference:
                     continue
-                existing_tracks.append({"id": int(track_id) if track_id_str.isdigit() else track_id})
-                existing_ids.add(track_id_str)
+                track_ref, track_key = reference
+                if track_key in existing_keys:
+                    continue
+                existing_track_refs.append(track_ref)
+                existing_keys.add(track_key)
+            for track_id in track_ids:
+                reference = self._build_track_reference(str(track_id))
+                if not reference:
+                    continue
+                track_ref, track_key = reference
+                if track_key in existing_keys:
+                    continue
+                existing_track_refs.append(track_ref)
+                existing_keys.add(track_key)
             update_payload = {
                 "playlist": {
                     "title": payload.get("title") or "Untitled",
-                    "tracks": [{"id": track.get("id")} for track in existing_tracks if track.get("id") is not None],
+                    "tracks": existing_track_refs,
                 }
             }
             update_response = await client.put(
@@ -476,7 +558,13 @@ class SoundcloudProvider(MusicProviderClient):
     async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         if not track_ids:
             return
-        remove_ids = {str(track_id) for track_id in track_ids}
+        remove_keys = {
+            reference[1]
+            for reference in (self._build_track_reference(str(track_id)) for track_id in track_ids)
+            if reference
+        }
+        if not remove_keys:
+            return
         async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
             response = await client.get(
                 f"/playlists/{provider_playlist_id}",
@@ -486,11 +574,21 @@ class SoundcloudProvider(MusicProviderClient):
             self._raise_for_status(response)
             payload = response.json()
             existing_tracks = payload.get("tracks", []) or []
-            kept_tracks = [track for track in existing_tracks if str(track.get("id")) not in remove_ids]
+            kept_track_refs: list[dict[str, str]] = []
+            seen_keys: set[str] = set()
+            for track in existing_tracks:
+                reference = self._extract_track_reference_from_payload(track)
+                if not reference:
+                    continue
+                track_ref, track_key = reference
+                if track_key in remove_keys or track_key in seen_keys:
+                    continue
+                kept_track_refs.append(track_ref)
+                seen_keys.add(track_key)
             update_payload = {
                 "playlist": {
                     "title": payload.get("title") or "Untitled",
-                    "tracks": [{"id": track.get("id")} for track in kept_tracks if track.get("id") is not None],
+                    "tracks": kept_track_refs,
                 }
             }
             update_response = await client.put(
@@ -500,3 +598,11 @@ class SoundcloudProvider(MusicProviderClient):
                 json=update_payload,
             )
             self._raise_for_status(update_response)
+
+    async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
+        track_reference = self._build_track_reference(track_id)
+        if not track_reference:
+            return False
+        target_key = track_reference[1]
+        tracks = await self.list_tracks(provider_playlist_id)
+        return any(self._track_reference_key(track.provider_track_id) == target_key for track in tracks)
