@@ -4,19 +4,8 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
-import os
 from dotenv import load_dotenv
 from app.db.session import Base
-from app.models.user import User
-from app.models.user_settings import UserSettings
-from app.models.votuna import (
-    VotunaPlaylist,
-    VotunaPlaylistSettings,
-    VotunaPlaylistMember,
-    VotunaPlaylistInvite,
-    VotunaTrackSuggestion,
-    VotunaTrackVote,
-)
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +22,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.config.settings import settings
+
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -73,18 +63,16 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
-    
+    configuration["sqlalchemy.url"] = settings.DATABASE_URL  # type: ignore[arg-type]
+
     connectable = engine_from_config(
-        configuration,
+        configuration,  # type: ignore[arg-type]
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

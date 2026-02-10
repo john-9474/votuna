@@ -96,7 +96,7 @@ async def _fetch_soundcloud_permalink_url(
 async def login_provider(
     provider: AuthProvider,
     invite_token: str | None = Query(default=None),
-    next_path: str | None = Query(default=None, alias="next"),
+    next_path: str = Query(default=None, alias="next"),
 ) -> Response:
     """Redirect the user to the provider's OAuth login flow."""
     try:

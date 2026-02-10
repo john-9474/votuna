@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
 
     # Database
-    DATABASE_URL: str
+    DATABASE_URL: str = ""
     SQLALCHEMY_ECHO: bool = False
 
     # Auth (SSO + JWT)

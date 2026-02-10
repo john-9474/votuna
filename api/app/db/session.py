@@ -1,7 +1,9 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from typing import Generator
+
 from app.config.settings import settings
+from app.models.base import BaseModel
 
 # Create SQLAlchemy engine
 engine = create_engine(
@@ -13,8 +15,8 @@ engine = create_engine(
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create base class for models
-Base = declarative_base()
+# Use the shared declarative base used by all ORM models.
+Base = BaseModel
 
 
 def get_db() -> Generator[Session, None, None]:

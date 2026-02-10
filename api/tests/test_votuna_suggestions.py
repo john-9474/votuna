@@ -503,6 +503,7 @@ def test_tie_mode_reject_rejects(
 ):
     _set_known_members(db_session, votuna_playlist, user.id, [other_user.id])
     settings = votuna_playlist_settings_crud.get_by_playlist_id(db_session, votuna_playlist.id)
+    assert settings is not None
     votuna_playlist_settings_crud.update(
         db_session,
         settings,

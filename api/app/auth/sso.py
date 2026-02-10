@@ -150,16 +150,20 @@ def get_sso(provider: AuthProvider) -> SSOProtocol:
 def get_openid_value(openid: OpenIDUserProtocol | Mapping[str, Any], *keys: str) -> Any:
     """Extract the first truthy value for the given keys from an OpenID payload."""
     data: Mapping[str, Any] = {}
-    if hasattr(openid, "model_dump"):
-        raw = openid.model_dump()
+
+    model_dump = getattr(openid, "model_dump", None)
+    if callable(model_dump):
+        raw = model_dump()
         if isinstance(raw, dict):
             data = cast(Mapping[str, Any], raw)
-    elif hasattr(openid, "dict"):
-        raw = openid.dict()
-        if isinstance(raw, dict):
-            data = cast(Mapping[str, Any], raw)
-    elif isinstance(openid, Mapping):
-        data = openid
+    else:
+        as_dict = getattr(openid, "dict", None)
+        if callable(as_dict):
+            raw = as_dict()
+            if isinstance(raw, dict):
+                data = cast(Mapping[str, Any], raw)
+        elif isinstance(openid, Mapping):
+            data = openid
 
     for key in keys:
         value = getattr(openid, key, None)

@@ -1,36 +1,11 @@
 """Votuna suggestion routes."""
 
-from datetime import datetime, timezone
 import hashlib
-from typing import cast
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
-from app.db.session import get_db
-from app.models.user import User
-from app.models.votuna_playlist import VotunaPlaylist
-from app.models.votuna_suggestions import VotunaTrackSuggestion
-from app.schemas.votuna_playlist import ProviderTrackOut
-from app.schemas.votuna_suggestion import (
-    SuggestionResolutionReason,
-    SuggestionStatus,
-    VotunaTrackRecommendationDeclineCreate,
-    VotunaTrackReactionUpdate,
-    VotunaTrackSuggestionCreate,
-    VotunaTrackSuggestionOut,
-)
-from app.crud.votuna_playlist_member import votuna_playlist_member_crud
-from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
-from app.crud.votuna_track_addition import votuna_track_addition_crud
-from app.crud.votuna_track_recommendation_decline import (
-    votuna_track_recommendation_decline_crud,
-)
-from app.crud.votuna_track_suggestion import votuna_track_suggestion_crud
-from app.crud.votuna_track_vote import votuna_track_vote_crud
-from app.services.music_providers import ProviderAPIError, ProviderAuthError
-from app.services.music_providers.base import ProviderTrack
 from app.api.v1.routes.votuna.common import (
     get_owner_client,
     get_playlist_or_404,
@@ -39,6 +14,28 @@ from app.api.v1.routes.votuna.common import (
     require_member,
     require_owner,
 )
+from app.auth.dependencies import get_current_user
+from app.crud.votuna_playlist_member import votuna_playlist_member_crud
+from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
+from app.crud.votuna_track_addition import votuna_track_addition_crud
+from app.crud.votuna_track_recommendation_decline import (
+    votuna_track_recommendation_decline_crud,
+)
+from app.crud.votuna_track_suggestion import votuna_track_suggestion_crud
+from app.crud.votuna_track_vote import votuna_track_vote_crud
+from app.db.session import get_db
+from app.models.user import User
+from app.models.votuna_playlist import VotunaPlaylist
+from app.models.votuna_suggestions import VotunaTrackSuggestion
+from app.schemas.votuna_playlist import ProviderTrackOut
+from app.schemas.votuna_suggestion import (
+    VotunaTrackReactionUpdate,
+    VotunaTrackRecommendationDeclineCreate,
+    VotunaTrackSuggestionCreate,
+    VotunaTrackSuggestionOut,
+)
+from app.services.music_providers import ProviderAPIError, ProviderAuthError
+from app.services.music_providers.base import ProviderTrack
 
 router = APIRouter()
 

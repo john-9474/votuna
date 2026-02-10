@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
-from typing import Annotated
+from typing import Annotated, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
@@ -28,7 +28,7 @@ from app.schemas.votuna_invite import (
     VotunaPlaylistInviteCreateUser,
     VotunaPlaylistInviteOut,
 )
-from app.schemas.votuna_playlist import VotunaPlaylistOut
+from app.schemas.votuna_playlist import MusicProvider, VotunaPlaylistOut
 from app.services.music_providers import ProviderAPIError, ProviderAuthError
 from app.services.votuna_invites import (
     ensure_invite_is_active,
@@ -294,7 +294,7 @@ def list_pending_invites(
                 playlist_id=invite.playlist_id,
                 playlist_title=playlist.title,
                 playlist_image_url=playlist.image_url,
-                playlist_provider=playlist.provider,
+                playlist_provider=cast(MusicProvider, playlist.provider),
                 owner_user_id=owner_user_id,
                 owner_display_name=_display_name(owner),
                 created_at=invite.created_at,
@@ -533,7 +533,7 @@ def open_invite_link(
 
     next_path = f"/playlists/{playlist.id}"
     login_url = (
-        f"/api/v1/auth/login/{auth_provider.value}" f"?invite_token={quote(token)}&next={quote(next_path, safe='/')}"
+        f"/api/v1/auth/login/{auth_provider.value}?invite_token={quote(token)}&next={quote(next_path, safe='/')}"
     )
     return RedirectResponse(url=login_url, status_code=status.HTTP_302_FOUND)
 

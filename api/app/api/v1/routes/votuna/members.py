@@ -23,7 +23,7 @@ def list_votuna_members(
 ):
     """List members for a Votuna playlist."""
     require_member(db, playlist_id, current_user.id)
-    counts = dict(
+    suggestion_count_rows = (
         db.query(
             VotunaTrackSuggestion.suggested_by_user_id,
             func.count(VotunaTrackSuggestion.id),
@@ -35,6 +35,11 @@ def list_votuna_members(
         .group_by(VotunaTrackSuggestion.suggested_by_user_id)
         .all()
     )
+    counts: dict[int, int] = {}
+    for suggested_by_user_id, suggested_count in suggestion_count_rows:
+        if suggested_by_user_id is None:
+            continue
+        counts[suggested_by_user_id] = int(suggested_count)
     members = votuna_playlist_member_crud.list_members(db, playlist_id)
     payload: list[VotunaPlaylistMemberOut] = []
     for member, user in members:
