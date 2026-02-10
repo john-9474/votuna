@@ -28,7 +28,6 @@ export default function PlaylistDetailPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const playlistId = Array.isArray(params.id) ? params.id[0] : params.id
-  const storageKey = playlistId ? `votuna:playlist-tab:${playlistId}` : null
 
   const tabFromUrl = useMemo<PlaylistTabKey | null>(() => {
     const tab = searchParams.get('tab')
@@ -42,18 +41,8 @@ export default function PlaylistDetailPage() {
       setActiveTab(tabFromUrl)
       return
     }
-    if (!storageKey || typeof window === 'undefined') {
-      setActiveTab('playlist')
-      return
-    }
-    const stored = window.sessionStorage.getItem(storageKey)
-    setActiveTab(isPlaylistTab(stored) ? stored : 'playlist')
-  }, [storageKey, tabFromUrl])
-
-  useEffect(() => {
-    if (!storageKey || typeof window === 'undefined') return
-    window.sessionStorage.setItem(storageKey, activeTab)
-  }, [storageKey, activeTab])
+    setActiveTab('playlist')
+  }, [tabFromUrl])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -63,16 +52,11 @@ export default function PlaylistDetailPage() {
         setActiveTab(tab)
         return
       }
-      if (storageKey) {
-        const stored = window.sessionStorage.getItem(storageKey)
-        setActiveTab(isPlaylistTab(stored) ? stored : 'playlist')
-        return
-      }
       setActiveTab('playlist')
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [storageKey])
+  }, [])
 
   const activeTabIndex = TAB_KEYS.indexOf(activeTab)
   const state = usePlaylistDetailPage(playlistId, activeTab)
