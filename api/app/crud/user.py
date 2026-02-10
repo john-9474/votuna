@@ -1,6 +1,6 @@
 """User CRUD helpers"""
 
-from typing import Any, Optional
+from typing import Optional
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
