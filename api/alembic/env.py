@@ -1,7 +1,9 @@
 from logging.config import fileConfig
+from typing import Any
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+import sqlalchemy as sa
 
 from alembic import context
 from dotenv import load_dotenv
@@ -64,6 +66,15 @@ def run_migrations_online() -> None:
     """
     configuration = config.get_section(config.config_ini_section)
     configuration["sqlalchemy.url"] = settings.DATABASE_URL  # type: ignore[arg-type]
+    x_args: dict[str, Any] = context.get_x_argument(as_dictionary=True)
+
+    # Fail fast in deploys instead of waiting forever on locks.
+    lock_timeout_ms = int(str(x_args.get("lock_timeout_ms", "30000")))
+    statement_timeout_ms = int(str(x_args.get("statement_timeout_ms", "300000")))
+    if lock_timeout_ms <= 0:
+        lock_timeout_ms = 30000
+    if statement_timeout_ms <= 0:
+        statement_timeout_ms = 300000
 
     connectable = engine_from_config(
         configuration,  # type: ignore[arg-type]
@@ -72,6 +83,8 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        connection.execute(sa.text(f"SET lock_timeout TO '{lock_timeout_ms}ms'"))
+        connection.execute(sa.text(f"SET statement_timeout TO '{statement_timeout_ms}ms'"))
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
