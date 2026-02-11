@@ -1,5 +1,6 @@
 from logging.config import fileConfig
 from typing import Any
+import logging
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
@@ -26,6 +27,7 @@ if config.config_file_name is not None:
 from app.config.settings import settings
 
 target_metadata = Base.metadata
+logger = logging.getLogger("alembic.env")
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -82,13 +84,21 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
+    logger.info(
+        "Alembic migration start (lock_timeout_ms=%s, statement_timeout_ms=%s)",
+        lock_timeout_ms,
+        statement_timeout_ms,
+    )
     with connectable.connect() as connection:
+        logger.info("Alembic connected to database")
         connection.execute(sa.text(f"SET lock_timeout TO '{lock_timeout_ms}ms'"))
         connection.execute(sa.text(f"SET statement_timeout TO '{statement_timeout_ms}ms'"))
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
+            logger.info("Alembic running migrations")
             context.run_migrations()
+            logger.info("Alembic migrations finished")
 
 
 if context.is_offline_mode():
