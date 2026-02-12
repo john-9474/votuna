@@ -16,7 +16,11 @@ export default function VoteCountWithTooltip({
   collaboratorsLeftToVoteNames,
 }: VoteCountWithTooltipProps) {
   const leftToVoteText =
-    collaboratorsLeftToVoteNames.length > 0 ? collaboratorsLeftToVoteNames.join(', ') : 'None'
+    collaboratorsLeftToVoteNames.length > 0
+      ? collaboratorsLeftToVoteNames.join(', ')
+      : collaboratorsLeftToVoteCount === 0
+        ? 'None'
+        : `${collaboratorsLeftToVoteCount} collaborator${collaboratorsLeftToVoteCount === 1 ? '' : 's'}`
   const upvotersText = upvoters && upvoters.length > 0 ? upvoters.join(', ') : ''
   const downvotersText = downvoters && downvoters.length > 0 ? downvoters.join(', ') : ''
 
@@ -43,10 +47,6 @@ export default function VoteCountWithTooltip({
         </span>
         <span className="mt-2 block text-xs font-semibold text-[color:rgb(var(--votuna-ink)/0.7)]">
           Left to vote:
-        </span>
-        <span className="block text-xs text-[color:rgb(var(--votuna-ink)/0.8)]">
-          {collaboratorsLeftToVoteCount}{' '}
-          {collaboratorsLeftToVoteCount === 1 ? 'collaborator' : 'collaborators'}
         </span>
         <span className="block text-xs text-[color:rgb(var(--votuna-ink)/0.8)]">{leftToVoteText}</span>
         {upvotersText ? (
