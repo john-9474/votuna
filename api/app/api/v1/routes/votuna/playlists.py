@@ -1,5 +1,6 @@
 """Votuna playlist routes."""
 
+import random
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -555,3 +556,50 @@ async def remove_votuna_track(
     except ProviderAPIError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/playlists/{playlist_id}/shuffle", response_model=dict[str, str])
+async def shuffle_votuna_playlist(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Shuffle all tracks in a playlist (owner only)."""
+    playlist = require_owner(db, playlist_id, current_user.id)
+    client = get_owner_client(db, playlist)
+    
+    try:
+        # Get all current tracks in the playlist
+        tracks = await client.list_tracks(playlist.provider_playlist_id)
+    except ProviderAuthError:
+        raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    
+    if not tracks:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Playlist has no tracks to shuffle",
+        )
+    
+    # Extract track IDs and shuffle them
+    track_ids = [track.provider_track_id for track in tracks]
+    shuffled_track_ids = track_ids.copy()
+    random.shuffle(shuffled_track_ids)
+    
+    try:
+        # Remove all tracks from the playlist
+        await client.remove_tracks(playlist.provider_playlist_id, track_ids)
+        
+        # Re-add tracks in shuffled order
+        # Spotify has a limit of 100 tracks per add request, so we need to batch them
+        batch_size = 100
+        for i in range(0, len(shuffled_track_ids), batch_size):
+            batch = shuffled_track_ids[i:i + batch_size]
+            await client.add_tracks(playlist.provider_playlist_id, batch)
+    except ProviderAuthError:
+        raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+    
+    return {"message": f"Successfully shuffled {len(shuffled_track_ids)} tracks in the playlist"}

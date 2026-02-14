@@ -1,5 +1,5 @@
 import { Button } from '@tremor/react'
-import { RiCloseLine } from '@remixicon/react'
+import { RiCloseLine, RiShuffleLine } from '@remixicon/react'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
@@ -18,6 +18,10 @@ type TracksSectionProps = {
   isRemoveTrackPending: boolean
   removingTrackId: string | null
   statusMessage?: string
+  canShuffle?: boolean
+  onShuffle?: () => void
+  isShufflePending?: boolean
+  shuffleStatus?: string
 }
 
 const getProviderLabel = (provider: string) => {
@@ -52,6 +56,10 @@ export default function TracksSection({
   isRemoveTrackPending,
   removingTrackId,
   statusMessage,
+  canShuffle = false,
+  onShuffle,
+  isShufflePending = false,
+  shuffleStatus = '',
 }: TracksSectionProps) {
   const providerLabel = getProviderLabel(provider)
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_TRACKS)
@@ -72,6 +80,18 @@ export default function TracksSection({
             Tracks currently in the {providerLabel} playlist.
           </p>
         </div>
+        {canShuffle && onShuffle && (
+          <button
+            type="button"
+            onClick={onShuffle}
+            disabled={isShufflePending || tracks.length === 0}
+            className="inline-flex h-10 items-center gap-2 rounded-full border border-blue-200 px-3 text-sm text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+            title="Shuffle all tracks in this playlist"
+          >
+            <RiShuffleLine className="h-4 w-4" />
+            {isShufflePending ? 'Shuffling...' : 'Shuffle'}
+          </button>
+        )}
       </div>
 
       {isLoading ? (
@@ -183,6 +203,7 @@ export default function TracksSection({
         </div>
       )}
       {statusMessage ? <p className="mt-3 text-xs text-rose-500">{statusMessage}</p> : null}
+      {shuffleStatus ? <p className="mt-3 text-xs text-amber-500">{shuffleStatus}</p> : null}
     </SurfaceCard>
   )
 }

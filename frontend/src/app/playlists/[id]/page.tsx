@@ -235,6 +235,10 @@ export default function PlaylistDetailPage() {
               isRemoveTrackPending={state.isRemoveTrackPending}
               removingTrackId={state.removingTrackId}
               statusMessage={state.trackActionStatus}
+              canShuffle={state.canEditSettings}
+              onShuffle={state.shufflePlaylist}
+              isShufflePending={state.isShufflePending}
+              shuffleStatus={state.shuffleStatus}
             />
           </div>
         ) : null}

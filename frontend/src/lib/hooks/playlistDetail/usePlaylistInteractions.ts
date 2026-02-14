@@ -55,6 +55,7 @@ export function usePlaylistInteractions({
   const [suggestStatus, setSuggestStatus] = useState('')
   const [suggestionsActionStatus, setSuggestionsActionStatus] = useState('')
   const [trackActionStatus, setTrackActionStatus] = useState('')
+  const [shuffleStatus, setShuffleStatus] = useState('')
   const [searchQuery, setSearchQueryState] = useState('')
   const [searchResults, setSearchResults] = useState<ProviderTrack[]>([])
   const [suggestedSearchTrackIds, setSuggestedSearchTrackIds] = useState<string[]>([])
@@ -339,6 +340,23 @@ export function usePlaylistInteractions({
     },
   })
 
+  const shuffleMutation = useMutation({
+    mutationFn: async () => {
+      return apiJson<{ message: string }>(`/api/v1/votuna/playlists/${playlistId}/shuffle`, {
+        method: 'POST',
+        authRequired: true,
+      })
+    },
+    onSuccess: async () => {
+      setShuffleStatus('')
+      await queryClient.invalidateQueries({ queryKey: queryKeys.votunaTracks(playlistId) })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Unable to shuffle playlist'
+      setShuffleStatus(message)
+    },
+  })
+
   const searchTracks = async () => {
     if (!playlistId || !searchQuery.trim()) return
     setSearchStatus('')
@@ -567,6 +585,11 @@ export function usePlaylistInteractions({
     removeTrackMutation.mutate(providerTrackId)
   }
 
+  const shufflePlaylist = () => {
+    setShuffleStatus('')
+    shuffleMutation.mutate()
+  }
+
   return {
     searchQuery,
     setSearchQuery,
@@ -592,6 +615,9 @@ export function usePlaylistInteractions({
     isRemoveTrackPending: removeTrackMutation.isPending,
     removingTrackId,
     trackActionStatus,
+    shufflePlaylist,
+    isShufflePending: shuffleMutation.isPending,
+    shuffleStatus,
     recommendedTracks,
     recommendationsStatus,
     isRecommendationsLoading,
