@@ -9,6 +9,8 @@
   --votuna-accent: 234 88 12;
   --votuna-accent-soft: 255 237 213;
   --votuna-shadow: 15 23 42;
+  --votuna-primary: 234 88 12;
+  --votuna-primary-light: 255 237 213;
   color-scheme: light;
 }
 
@@ -19,7 +21,35 @@
   --votuna-accent: 249 115 22;
   --votuna-accent-soft: 113 63 18;
   --votuna-shadow: 9 9 11;
+  --votuna-primary: 249 115 22;
+  --votuna-primary-light: 113 63 18;
   color-scheme: dark;
+}
+
+/* Provider-specific themes */
+
+/* Spotify theme - Green */
+[data-provider='spotify']:root,
+html[data-provider='spotify'] {
+  --votuna-primary: 29 185 84;
+  --votuna-primary-light: 29 185 84;
+}
+
+[data-provider='spotify'][data-theme='dark'] {
+  --votuna-primary: 29 185 84;
+  --votuna-primary-light: 29 185 84;
+}
+
+/* SoundCloud theme - Orange */
+[data-provider='soundcloud']:root,
+html[data-provider='soundcloud'] {
+  --votuna-primary: 255 136 0;
+  --votuna-primary-light: 255 200 100;
+}
+
+[data-provider='soundcloud'][data-theme='dark'] {
+  --votuna-primary: 255 136 0;
+  --votuna-primary-light: 165 85 0;
 }
 
 body {
@@ -44,6 +74,30 @@ div[role='option'] {
 .votuna-select option {
   background-color: rgb(var(--votuna-paper));
   color: rgb(var(--votuna-ink));
+}
+
+/* Provider-themed accent utilities */
+.provider-accent {
+  color: rgb(var(--votuna-primary));
+}
+
+.provider-accent-border {
+  border-color: rgb(var(--votuna-primary));
+}
+
+.provider-accent-bg {
+  background-color: rgba(var(--votuna-primary), 0.1);
+}
+
+.provider-accent-text-light {
+  color: rgba(var(--votuna-primary), 0.7);
+}
+
+/* Interactive elements with provider theming */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgb(var(--votuna-primary));
+  outline-offset: 2px;
 }
 
 .fade-up {

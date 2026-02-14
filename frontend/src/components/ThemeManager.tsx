@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { apiJsonOrNull } from '../lib/api'
+import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 
 type ThemeSetting = 'light' | 'dark' | 'system'
 
@@ -13,6 +14,7 @@ type UserSettings = {
 }
 
 const THEME_STORAGE_KEY = 'votuna-theme'
+const PROVIDER_STORAGE_KEY = 'votuna-provider'
 
 function resolveTheme(theme: ThemeSetting) {
   if (theme === 'system') {
@@ -27,14 +29,33 @@ function applyTheme(theme: ThemeSetting) {
   document.documentElement.classList.toggle('dark', resolved === 'dark')
 }
 
-/** Apply the stored user theme preference to the document. */
+function applyProviderTheme(provider: string | null | undefined) {
+  if (!provider) {
+    delete document.documentElement.dataset.provider
+    localStorage.removeItem(PROVIDER_STORAGE_KEY)
+    return
+  }
+  document.documentElement.dataset.provider = provider.toLowerCase()
+  localStorage.setItem(PROVIDER_STORAGE_KEY, provider.toLowerCase())
+}
+
+/** Apply the stored user theme preference and provider-based theme to the document. */
 export default function ThemeManager() {
   const [theme, setTheme] = useState<ThemeSetting>('system')
+  const [provider, setProvider] = useState<string | null>(null)
+  const currentUserQuery = useCurrentUser()
 
   useEffect(() => {
     const storedTheme = (localStorage.getItem(THEME_STORAGE_KEY) as ThemeSetting | null) ?? 'system'
     setTheme(storedTheme)
     applyTheme(storedTheme)
+
+    // Apply stored provider theme if available
+    const storedProvider = localStorage.getItem(PROVIDER_STORAGE_KEY)
+    if (storedProvider) {
+      setProvider(storedProvider)
+      applyProviderTheme(storedProvider)
+    }
   }, [])
 
   const settingsQuery = useQuery({
@@ -43,6 +64,13 @@ export default function ThemeManager() {
     refetchInterval: 60_000,
     staleTime: 60_000,
   })
+
+  // Apply user's auth provider theme
+  useEffect(() => {
+    if (!currentUserQuery.data?.auth_provider) return
+    setProvider(currentUserQuery.data.auth_provider)
+    applyProviderTheme(currentUserQuery.data.auth_provider)
+  }, [currentUserQuery.data?.auth_provider])
 
   useEffect(() => {
     if (!settingsQuery.data?.theme) return

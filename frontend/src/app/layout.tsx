@@ -45,6 +45,11 @@ export default function RootLayout({
     } else {
       document.documentElement.classList.remove('dark');
     }
+    // Apply provider theme if stored
+    var provider = localStorage.getItem('votuna-provider');
+    if (provider) {
+      document.documentElement.dataset.provider = provider;
+    }
   } catch (e) {}
 })();`,
           }}

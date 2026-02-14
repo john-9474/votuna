@@ -11,6 +11,7 @@ import UserAvatar from '@/components/ui/UserAvatar'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { User } from '@/lib/types/user'
 import { apiFetch, API_URL } from '../lib/api'
+import { getProviderColor } from '@/lib/providerColors'
 
 /** Select the best display name for the current user. */
 function getDisplayName(user: User | null) {
@@ -120,7 +121,23 @@ export default function Navbar() {
 
         <div className="flex items-center gap-3">
           {user ? (
-            <Menu as="div" className="relative">
+            <>
+              {user.auth_provider && (
+                <div
+                  className="px-2 py-1 rounded-full text-xs font-medium border transition"
+                  style={{
+                    color: `rgb(${getProviderColor(user.auth_provider)?.primary})`,
+                    borderColor: `rgba(${getProviderColor(user.auth_provider)?.primary}, 0.3)`,
+                  }}
+                >
+                  {user.auth_provider === 'spotify' && '🎵 Spotify'}
+                  {user.auth_provider === 'soundcloud' && '☁️ SoundCloud'}
+                  {user.auth_provider === 'apple' && '🍎 Apple'}
+                  {!['spotify', 'soundcloud', 'apple'].includes(user.auth_provider || '') &&
+                    user.auth_provider}
+                </div>
+              )}
+              <Menu as="div" className="relative">
               <Menu.Button className="flex items-center gap-2 rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2 text-sm font-medium text-[color:rgb(var(--votuna-ink)/0.7)] shadow-sm transition hover:shadow-md">
                 <span className="relative flex h-8 w-8 items-center justify-center">
                   <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgb(var(--votuna-paper))]">
@@ -165,6 +182,7 @@ export default function Navbar() {
                 </Menu.Item>
               </Menu.Items>
             </Menu>
+            </>
           ) : (
             <Button
               onClick={() => setLoginOpen(true)}
