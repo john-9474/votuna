@@ -17,6 +17,7 @@ from app.services.music_providers.base import (
     ProviderUser,
 )
 
+
 class SpotifyProvider(MusicProviderClient):
     provider = "spotify"
 

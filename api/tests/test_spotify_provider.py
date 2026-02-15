@@ -208,7 +208,7 @@ def test_list_tracks_and_add_remove_tracks(monkeypatch):
                                     "album": {"images": [{"url": "https://img.test/track-2.jpg"}]},
                                     "external_urls": {"spotify": "https://open.spotify.com/track/track-2"},
                                 }
-                            }
+                            },
                         ],
                         "next": "https://api.spotify.com/v1/playlists/playlist-1/items?offset=100",
                     },
