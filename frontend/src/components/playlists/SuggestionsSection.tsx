@@ -1,8 +1,9 @@
 import { RiAddLine, RiCloseLine, RiThumbDownLine, RiThumbUpLine } from '@remixicon/react'
-import { Button } from '@tremor/react'
 
 import type { Suggestion, TrackPlayRequest } from '@/lib/types/votuna'
+import AppButton from '@/components/ui/AppButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
 import TrackArtwork from './TrackArtwork'
@@ -28,13 +29,6 @@ const formatAddedDate = (addedAt: string | null | undefined) => {
   if (Number.isNaN(date.getTime())) return 'Added date unavailable'
   return `Added ${date.toLocaleDateString()}`
 }
-
-const reactionButtonBaseClass =
-  'inline-flex h-10 w-10 items-center justify-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60'
-const destructiveActionButtonClass =
-  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
-const forceAddButtonClass =
-  'inline-flex h-10 items-center justify-center gap-1 rounded-full border border-emerald-300 bg-emerald-50/70 px-4 text-xs font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100/70 disabled:cursor-not-allowed disabled:opacity-60'
 
 export default function SuggestionsSection({
   suggestions,
@@ -120,7 +114,8 @@ export default function SuggestionsSection({
                   </div>
                   <div className="flex items-center gap-2">
                     {suggestion.track_url ? (
-                      <Button
+                      <AppButton
+                        intent="secondary"
                         onClick={() =>
                           onPlayTrack({
                             key: `suggestion-${suggestion.id}`,
@@ -130,59 +125,55 @@ export default function SuggestionsSection({
                             artworkUrl: suggestion.track_artwork_url,
                           })
                         }
-                        variant="secondary"
-                        className="w-24 justify-center rounded-full"
+                        className="w-24 justify-center"
                       >
                         Play
-                      </Button>
+                      </AppButton>
                     ) : null}
-                    <button
+                    <AppButton
                       type="button"
+                      intent="icon"
+                      variant={suggestion.my_reaction === 'up' ? 'primary' : 'secondary'}
+                      color="emerald"
                       disabled={isReactionPending}
                       aria-label="Thumbs up"
                       onClick={() => onSetReaction(suggestion.id, 'up')}
-                      className={`${reactionButtonBaseClass} ${
-                        suggestion.my_reaction === 'up'
-                          ? 'border-emerald-400 bg-emerald-100/70 text-emerald-700'
-                          : 'border-[color:rgb(var(--votuna-ink)/0.16)] text-[color:rgb(var(--votuna-ink)/0.75)] hover:border-emerald-400 hover:text-emerald-700'
-                      }`}
                     >
                       <RiThumbUpLine className="h-4 w-4" />
-                    </button>
-                    <button
+                    </AppButton>
+                    <AppButton
                       type="button"
+                      intent="icon"
+                      variant={suggestion.my_reaction === 'down' ? 'primary' : 'secondary'}
+                      color="rose"
                       disabled={isReactionPending}
                       aria-label="Thumbs down"
                       onClick={() => onSetReaction(suggestion.id, 'down')}
-                      className={`${reactionButtonBaseClass} ${
-                        suggestion.my_reaction === 'down'
-                          ? 'border-rose-400 bg-rose-100/70 text-rose-700'
-                          : 'border-[color:rgb(var(--votuna-ink)/0.16)] text-[color:rgb(var(--votuna-ink)/0.75)] hover:border-rose-400 hover:text-rose-700'
-                      }`}
                     >
                       <RiThumbDownLine className="h-4 w-4" />
-                    </button>
+                    </AppButton>
                     {suggestion.can_cancel ? (
-                      <button
+                      <AppButton
                         type="button"
-                        disabled={isCancelPending}
+                        intent="icon"
+                        color="rose"
                         aria-label="Cancel suggestion"
+                        disabled={isCancelPending}
                         onClick={() => onCancelSuggestion(suggestion.id)}
-                        className={destructiveActionButtonClass}
                       >
                         <RiCloseLine className="h-4 w-4" />
-                      </button>
+                      </AppButton>
                     ) : null}
                     {suggestion.can_force_add ? (
-                      <button
+                      <AppButton
                         type="button"
+                        intent="success"
                         onClick={() => onForceAddSuggestion(suggestion.id)}
                         disabled={isForceAddPending}
-                        className={forceAddButtonClass}
                       >
                         <RiAddLine className="h-4 w-4" />
                         Force add
-                      </button>
+                      </AppButton>
                     ) : null}
                   </div>
                 </div>
@@ -191,7 +182,11 @@ export default function SuggestionsSection({
           ))}
         </div>
       )}
-      {statusMessage ? <p className="mt-3 text-xs text-rose-500">{statusMessage}</p> : null}
+      {statusMessage ? (
+        <StatusCallout tone="error" title="Suggestion status" className="mt-3">
+          {statusMessage}
+        </StatusCallout>
+      ) : null}
     </SurfaceCard>
   )
 }

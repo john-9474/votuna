@@ -11,6 +11,7 @@ from app.api.v1.routes.votuna.common import (
     get_owner_client,
     get_playlist_or_404,
     raise_provider_auth,
+    raise_provider_api_error,
     require_owner,
 )
 from app.auth.dependencies import get_current_user
@@ -196,7 +197,8 @@ async def _safe_get_playlist(
         raise_provider_auth(current_user, owner_id=owner_id, provider=provider)
         raise AssertionError("unreachable")
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     return ResolvedProviderPlaylist(
         provider=provider_playlist.provider,  # type: ignore[arg-type]
         provider_playlist_id=provider_playlist.provider_playlist_id,
@@ -218,7 +220,8 @@ async def _safe_list_tracks(
         raise_provider_auth(current_user, owner_id=owner_id, provider=provider)
         raise AssertionError("unreachable")
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     return list(tracks)
 
 

@@ -5,8 +5,8 @@ import { ReactNode, useState } from 'react'
 
 const defaultOptions = {
   queries: {
-    refetchOnWindowFocus: true,
-    retry: 1,
+    refetchOnWindowFocus: false,
+    retry: 0,
     staleTime: 10_000,
     gcTime: 120_000,
   },

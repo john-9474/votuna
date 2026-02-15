@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Sequence
+import asyncio
+import hashlib
+import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Awaitable, Callable, Sequence, TypeVar
 from urllib.parse import urlparse
 
 import httpx
@@ -17,13 +22,26 @@ from app.services.music_providers.base import (
     ProviderUser,
 )
 
+T = TypeVar("T")
+
 
 class SpotifyProvider(MusicProviderClient):
     provider = "spotify"
+    _REQUEST_TIMEOUT_SECONDS = 15
+    _PLAYLIST_CACHE_TTL_SECONDS = 30.0
+    _TRACK_CACHE_TTL_SECONDS = 20.0
+    _MAX_RATE_LIMIT_RETRIES = 1
+    _MAX_RATE_LIMIT_WAIT_SECONDS = 10.0
+
+    _cache_lock = asyncio.Lock()
+    _inflight_requests: dict[str, asyncio.Task[list[Any]]] = {}
+    _playlists_cache: dict[str, tuple[float, list[ProviderPlaylist]]] = {}
+    _tracks_cache: dict[str, tuple[float, list[ProviderTrack]]] = {}
 
     def __init__(self, access_token: str):
         super().__init__(access_token)
         self.base_url = settings.SPOTIFY_API_BASE_URL or "https://api.spotify.com/v1"
+        self._cache_identity = hashlib.sha256(access_token.encode("utf-8")).hexdigest()[:16]
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -74,6 +92,106 @@ class SpotifyProvider(MusicProviderClient):
                 return raw_total
         return None
 
+    @staticmethod
+    def _parse_retry_after_seconds(retry_after: str | None) -> float | None:
+        if not retry_after:
+            return None
+        value = retry_after.strip()
+        if not value:
+            return None
+        try:
+            parsed_seconds = float(value)
+            if parsed_seconds >= 0:
+                return parsed_seconds
+            return None
+        except ValueError:
+            pass
+        try:
+            retry_at = parsedate_to_datetime(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if retry_at.tzinfo is None:
+            retry_at = retry_at.replace(tzinfo=timezone.utc)
+        delay_seconds = (retry_at - datetime.now(timezone.utc)).total_seconds()
+        return max(delay_seconds, 0.0)
+
+    async def _request_with_rate_limit_retry(
+        self,
+        request: Callable[[], Awaitable[httpx.Response]],
+    ) -> httpx.Response:
+        attempts = self._MAX_RATE_LIMIT_RETRIES + 1
+        last_response: httpx.Response | None = None
+        for attempt in range(attempts):
+            response = await request()
+            last_response = response
+            if response.status_code != 429:
+                return response
+            if attempt >= self._MAX_RATE_LIMIT_RETRIES:
+                return response
+            retry_after_seconds = self._parse_retry_after_seconds(response.headers.get("Retry-After"))
+            sleep_seconds = retry_after_seconds if retry_after_seconds is not None else 1.0
+            bounded_sleep_seconds = min(max(sleep_seconds, 0.25), self._MAX_RATE_LIMIT_WAIT_SECONDS)
+            await asyncio.sleep(bounded_sleep_seconds)
+        assert last_response is not None
+        return last_response
+
+    @classmethod
+    async def _run_deduped_request(
+        cls,
+        key: str,
+        operation: Callable[[], Awaitable[list[Any]]],
+    ) -> list[Any]:
+        created_task = False
+        async with cls._cache_lock:
+            task = cls._inflight_requests.get(key)
+            if task is None:
+                task = asyncio.create_task(operation())
+                cls._inflight_requests[key] = task
+                created_task = True
+        try:
+            result = await task
+            return list(result)
+        finally:
+            if created_task:
+                async with cls._cache_lock:
+                    if cls._inflight_requests.get(key) is task:
+                        cls._inflight_requests.pop(key, None)
+
+    @staticmethod
+    def _get_cached_list(
+        cache: dict[str, tuple[float, list[T]]],
+        key: str,
+        ttl_seconds: float,
+    ) -> list[T] | None:
+        cached_entry = cache.get(key)
+        if not cached_entry:
+            return None
+        cached_at, cached_value = cached_entry
+        if (time.monotonic() - cached_at) > ttl_seconds:
+            cache.pop(key, None)
+            return None
+        return list(cached_value)
+
+    @staticmethod
+    def _set_cached_list(
+        cache: dict[str, tuple[float, list[T]]],
+        key: str,
+        value: list[T],
+    ) -> None:
+        cache[key] = (time.monotonic(), list(value))
+
+    def _playlist_cache_key(self) -> str:
+        return f"spotify:playlists:{self._cache_identity}"
+
+    def _track_cache_key(self, playlist_id: str) -> str:
+        return f"spotify:tracks:{self._cache_identity}:{playlist_id}"
+
+    def _invalidate_playlist_cache(self) -> None:
+        self._playlists_cache.pop(self._playlist_cache_key(), None)
+
+    def _invalidate_track_cache(self, playlist_id: str) -> None:
+        self._tracks_cache.pop(self._track_cache_key(playlist_id), None)
+
     def _raise_for_status(self, response: httpx.Response) -> None:
         try:
             response.raise_for_status()
@@ -88,6 +206,17 @@ class SpotifyProvider(MusicProviderClient):
 
             if status_code in {401, 403}:
                 raise ProviderAuthError("Spotify authorization expired or invalid") from exc
+
+            if status_code == 429:
+                retry_after_seconds = self._parse_retry_after_seconds(exc.response.headers.get("Retry-After"))
+                retry_suffix = ""
+                if retry_after_seconds is not None:
+                    retry_suffix = f"; retry after ~{int(round(retry_after_seconds))}s"
+                detail_suffix = f": {provider_message}" if provider_message else ""
+                raise ProviderAPIError(
+                    f"Spotify API rate limit exceeded (429){retry_suffix}{detail_suffix}",
+                    status_code=status_code,
+                ) from exc
 
             detail_suffix = f": {provider_message}" if provider_message else ""
             raise ProviderAPIError(
@@ -211,9 +340,11 @@ class SpotifyProvider(MusicProviderClient):
         )
 
     async def _fetch_current_user_id(self, client: httpx.AsyncClient) -> str:
-        response = await client.get(
-            "/me",
-            headers=self._headers(),
+        response = await self._request_with_rate_limit_retry(
+            lambda: client.get(
+                "/me",
+                headers=self._headers(),
+            )
         )
         self._raise_for_status(response)
         payload = response.json()
@@ -225,35 +356,52 @@ class SpotifyProvider(MusicProviderClient):
         return user_id
 
     async def list_playlists(self) -> Sequence[ProviderPlaylist]:
-        playlists: list[ProviderPlaylist] = []
-        next_url: str | None = "/me/playlists"
-        params: dict[str, int] | None = {"limit": 50}
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            while next_url:
-                response = await client.get(next_url, headers=self._headers(), params=params)
-                self._raise_for_status(response)
-                payload = response.json()
-                if not isinstance(payload, dict):
-                    break
-                items = payload.get("items")
-                if isinstance(items, list):
-                    for item in items:
-                        mapped = self._to_provider_playlist(item)
-                        if mapped:
-                            playlists.append(mapped)
-                raw_next = payload.get("next")
-                next_url = raw_next if isinstance(raw_next, str) and raw_next else None
-                params = None
-        return playlists
+        cache_key = self._playlist_cache_key()
+        cached_playlists = self._get_cached_list(
+            self._playlists_cache,
+            cache_key,
+            self._PLAYLIST_CACHE_TTL_SECONDS,
+        )
+        if cached_playlists is not None:
+            return cached_playlists
+
+        async def fetch_playlists() -> list[Any]:
+            playlists: list[ProviderPlaylist] = []
+            next_url: str | None = "/me/playlists"
+            params: dict[str, int] | None = {"limit": 50}
+            async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+                while next_url:
+                    response = await self._request_with_rate_limit_retry(
+                        lambda: client.get(next_url, headers=self._headers(), params=params)
+                    )
+                    self._raise_for_status(response)
+                    payload = response.json()
+                    if not isinstance(payload, dict):
+                        break
+                    items = payload.get("items")
+                    if isinstance(items, list):
+                        for item in items:
+                            mapped = self._to_provider_playlist(item)
+                            if mapped:
+                                playlists.append(mapped)
+                    raw_next = payload.get("next")
+                    next_url = raw_next if isinstance(raw_next, str) and raw_next else None
+                    params = None
+            self._set_cached_list(self._playlists_cache, cache_key, playlists)
+            return playlists
+
+        return await self._run_deduped_request(cache_key, fetch_playlists)
 
     async def get_playlist(self, provider_playlist_id: str) -> ProviderPlaylist:
         playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
         if not playlist_id:
             raise ProviderAPIError("Playlist id is required", status_code=400)
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.get(
-                f"/playlists/{playlist_id}",
-                headers=self._headers(),
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.get(
+                    f"/playlists/{playlist_id}",
+                    headers=self._headers(),
+                )
             )
             self._raise_for_status(response)
             payload = response.json()
@@ -267,15 +415,17 @@ class SpotifyProvider(MusicProviderClient):
         if not search_query:
             return []
         safe_limit = max(1, min(limit, 25))
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.get(
-                "/search",
-                headers=self._headers(),
-                params={
-                    "q": search_query,
-                    "type": "playlist",
-                    "limit": safe_limit,
-                },
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.get(
+                    "/search",
+                    headers=self._headers(),
+                    params={
+                        "q": search_query,
+                        "type": "playlist",
+                        "limit": safe_limit,
+                    },
+                )
             )
             self._raise_for_status(response)
             payload = response.json()
@@ -309,22 +459,25 @@ class SpotifyProvider(MusicProviderClient):
         description: str | None = None,
         is_public: bool | None = None,
     ) -> ProviderPlaylist:
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
             user_id = await self._fetch_current_user_id(client)
-            response = await client.post(
-                f"/users/{user_id}/playlists",
-                headers=self._headers(),
-                json={
-                    "name": title,
-                    "description": description or "",
-                    "public": bool(is_public),
-                },
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.post(
+                    f"/users/{user_id}/playlists",
+                    headers=self._headers(),
+                    json={
+                        "name": title,
+                        "description": description or "",
+                        "public": bool(is_public),
+                    },
+                )
             )
             self._raise_for_status(response)
             payload = response.json()
         mapped = self._to_provider_playlist(payload)
         if not mapped:
             raise ProviderAPIError("Unable to create playlist", status_code=502)
+        self._invalidate_playlist_cache()
         return ProviderPlaylist(
             provider=mapped.provider,
             provider_playlist_id=mapped.provider_playlist_id,
@@ -340,33 +493,48 @@ class SpotifyProvider(MusicProviderClient):
         playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
         if not playlist_id:
             raise ProviderAPIError("Playlist id is required", status_code=400)
-        tracks: list[ProviderTrack] = []
-        next_url: str | None = f"/playlists/{playlist_id}/items"
-        params: dict[str, int | str] | None = {"limit": 100, "offset": 0}
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            while next_url:
-                response = await client.get(next_url, headers=self._headers(), params=params)
-                self._raise_for_status(response)
-                payload = response.json()
-                if not isinstance(payload, dict):
-                    break
-                items = payload.get("items")
-                if isinstance(items, list):
-                    for item in items:
-                        if not isinstance(item, dict):
-                            continue
-                        # Spotify currently returns playlist entries as `item`,
-                        # while older payloads and some SDK shapes use `track`.
-                        track_payload = item.get("item")
-                        if not isinstance(track_payload, dict):
-                            track_payload = item.get("track")
-                        mapped = self._to_provider_track(track_payload)
-                        if mapped:
-                            tracks.append(mapped)
-                raw_next = payload.get("next")
-                next_url = raw_next if isinstance(raw_next, str) and raw_next else None
-                params = None
-        return tracks
+        cache_key = self._track_cache_key(playlist_id)
+        cached_tracks = self._get_cached_list(
+            self._tracks_cache,
+            cache_key,
+            self._TRACK_CACHE_TTL_SECONDS,
+        )
+        if cached_tracks is not None:
+            return cached_tracks
+
+        async def fetch_tracks() -> list[Any]:
+            tracks: list[ProviderTrack] = []
+            next_url: str | None = f"/playlists/{playlist_id}/items"
+            params: dict[str, int | str] | None = {"limit": 100, "offset": 0}
+            async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+                while next_url:
+                    response = await self._request_with_rate_limit_retry(
+                        lambda: client.get(next_url, headers=self._headers(), params=params)
+                    )
+                    self._raise_for_status(response)
+                    payload = response.json()
+                    if not isinstance(payload, dict):
+                        break
+                    items = payload.get("items")
+                    if isinstance(items, list):
+                        for item in items:
+                            if not isinstance(item, dict):
+                                continue
+                            # Spotify currently returns playlist entries as `item`,
+                            # while older payloads and some SDK shapes use `track`.
+                            track_payload = item.get("item")
+                            if not isinstance(track_payload, dict):
+                                track_payload = item.get("track")
+                            mapped = self._to_provider_track(track_payload)
+                            if mapped:
+                                tracks.append(mapped)
+                    raw_next = payload.get("next")
+                    next_url = raw_next if isinstance(raw_next, str) and raw_next else None
+                    params = None
+            self._set_cached_list(self._tracks_cache, cache_key, tracks)
+            return tracks
+
+        return await self._run_deduped_request(cache_key, fetch_tracks)
 
     async def add_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
@@ -382,13 +550,17 @@ class SpotifyProvider(MusicProviderClient):
             normalized_uris.append(track_uri)
         if not normalized_uris:
             return
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.post(
-                f"/playlists/{playlist_id}/items",
-                headers=self._headers(),
-                json={"uris": normalized_uris},
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.post(
+                    f"/playlists/{playlist_id}/items",
+                    headers=self._headers(),
+                    json={"uris": normalized_uris},
+                )
             )
             self._raise_for_status(response)
+        self._invalidate_track_cache(playlist_id)
+        self._invalidate_playlist_cache()
 
     async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
@@ -404,29 +576,35 @@ class SpotifyProvider(MusicProviderClient):
             normalized_tracks_payload.append({"uri": track_uri})
         if not normalized_tracks_payload:
             return
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.request(
-                "DELETE",
-                f"/playlists/{playlist_id}/items",
-                headers=self._headers(),
-                json={"tracks": normalized_tracks_payload},
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.request(
+                    "DELETE",
+                    f"/playlists/{playlist_id}/items",
+                    headers=self._headers(),
+                    json={"tracks": normalized_tracks_payload},
+                )
             )
             self._raise_for_status(response)
+        self._invalidate_track_cache(playlist_id)
+        self._invalidate_playlist_cache()
 
     async def search_tracks(self, query: str, limit: int = 10) -> Sequence[ProviderTrack]:
         search_query = query.strip()
         if not search_query:
             return []
         safe_limit = max(1, min(limit, 25))
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.get(
-                "/search",
-                headers=self._headers(),
-                params={
-                    "q": search_query,
-                    "type": "track",
-                    "limit": safe_limit,
-                },
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.get(
+                    "/search",
+                    headers=self._headers(),
+                    params={
+                        "q": search_query,
+                        "type": "track",
+                        "limit": safe_limit,
+                    },
+                )
             )
             self._raise_for_status(response)
             payload = response.json()
@@ -461,10 +639,12 @@ class SpotifyProvider(MusicProviderClient):
         track_id = self._normalize_resource_id(track_ref, "track")
         if not track_id:
             raise ProviderAPIError("Resolved URL is not a track", status_code=400)
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.get(
-                f"/tracks/{track_id}",
-                headers=self._headers(),
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.get(
+                    f"/tracks/{track_id}",
+                    headers=self._headers(),
+                )
             )
             self._raise_for_status(response)
             payload = response.json()
@@ -481,10 +661,12 @@ class SpotifyProvider(MusicProviderClient):
         user_id = self._normalize_resource_id(provider_user_id, "user")
         if not user_id:
             raise ProviderAPIError("Provider user id is required", status_code=400)
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=15) as client:
-            response = await client.get(
-                f"/users/{user_id}",
-                headers=self._headers(),
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            response = await self._request_with_rate_limit_retry(
+                lambda: client.get(
+                    f"/users/{user_id}",
+                    headers=self._headers(),
+                )
             )
             self._raise_for_status(response)
             payload = response.json()

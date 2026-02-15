@@ -1,11 +1,11 @@
 import { RiPlayFill, RiThumbDownLine, RiThumbUpLine } from '@remixicon/react'
-import { Button } from '@tremor/react'
 import Image from 'next/image'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
+import AppButton from '@/components/ui/AppButton'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
-import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
 import TrackArtwork from './TrackArtwork'
@@ -114,15 +114,16 @@ export default function SearchSuggestSection({
           containerClassName="flex-1"
           clearAriaLabel="Clear track search"
         />
-        <PrimaryButton
-          type="submit"
-          disabled={isSearching || !searchQuery.trim()}
-        >
+        <AppButton type="submit" disabled={isSearching || !searchQuery.trim()}>
           {isSearching ? 'Searching...' : 'Search'}
-        </PrimaryButton>
+        </AppButton>
       </form>
 
-      {searchStatus ? <p className="mt-3 text-xs text-rose-500">{searchStatus}</p> : null}
+      {searchStatus ? (
+        <StatusCallout tone="error" title="Search status" className="mt-3">
+          {searchStatus}
+        </StatusCallout>
+      ) : null}
 
       {searchResults.length > 0 ? (
         <div className="mt-4 space-y-3">
@@ -145,9 +146,7 @@ export default function SearchSuggestSection({
                         {track.title}
                       </a>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
-                        {track.title}
-                      </p>
+                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
                     )}
                     <p className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                       {track.artist || 'Unknown artist'}
@@ -156,7 +155,8 @@ export default function SearchSuggestSection({
                 </div>
                 <div className="flex items-center gap-2">
                   {track.url ? (
-                    <Button
+                    <AppButton
+                      intent="secondary"
                       onClick={() =>
                         onPlayTrack({
                           key: `search-${track.provider_track_id}`,
@@ -166,36 +166,27 @@ export default function SearchSuggestSection({
                           artworkUrl: track.artwork_url,
                         })
                       }
-                      variant="secondary"
-                      className="w-24 justify-center rounded-full"
+                      className="w-24 justify-center"
                     >
                       Play
-                    </Button>
+                    </AppButton>
                   ) : null}
                   {isTrackInPlaylist(track.provider_track_id) ? (
-                    <Button
-                      disabled
-                      variant="secondary"
-                      className="w-24 justify-center rounded-full"
-                    >
+                    <AppButton disabled intent="secondary" className="w-24 justify-center">
                       In playlist
-                    </Button>
+                    </AppButton>
                   ) : isCollaborative && isTrackSuggested(track.provider_track_id) ? (
-                    <Button
-                      disabled
-                      variant="secondary"
-                      className="w-24 justify-center rounded-full"
-                    >
+                    <AppButton disabled intent="secondary" className="w-24 justify-center">
                       Suggested
-                    </Button>
+                    </AppButton>
                   ) : (
-                    <PrimaryButton
+                    <AppButton
                       onClick={() => onSuggestFromSearch(track)}
                       disabled={isSuggestPending}
                       className="w-24 justify-center"
                     >
                       {isCollaborative ? 'Suggest' : 'Add'}
-                    </PrimaryButton>
+                    </AppButton>
                   )}
                 </div>
               </div>
@@ -223,15 +214,16 @@ export default function SearchSuggestSection({
             containerClassName="flex-1"
             clearAriaLabel="Clear track link"
           />
-          <PrimaryButton
-            type="submit"
-            disabled={isSuggestPending || !linkSuggestionUrl.trim()}
-          >
+          <AppButton type="submit" disabled={isSuggestPending || !linkSuggestionUrl.trim()}>
             {isSuggestPending ? 'Adding...' : isCollaborative ? 'Suggest from link' : 'Add from link'}
-          </PrimaryButton>
+          </AppButton>
         </form>
       </div>
-      {suggestStatus ? <p className="mt-3 text-xs text-rose-500">{suggestStatus}</p> : null}
+      {suggestStatus ? (
+        <StatusCallout tone="error" title="Suggestion status" className="mt-3">
+          {suggestStatus}
+        </StatusCallout>
+      ) : null}
 
       <div className="mt-6 border-t border-[color:rgb(var(--votuna-ink)/0.08)] pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -239,14 +231,13 @@ export default function SearchSuggestSection({
             Suggested for this playlist
           </p>
           <div className="flex items-center gap-2">
-            <Button
+            <AppButton
+              intent="secondary"
               onClick={onRefreshRecommendations}
-              variant="secondary"
-              className="rounded-full"
               disabled={isRecommendationsLoading || inPlaylistTrackIds.length === 0}
             >
               Refresh
-            </Button>
+            </AppButton>
           </div>
         </div>
 
@@ -255,13 +246,9 @@ export default function SearchSuggestSection({
             Add tracks to this playlist to generate recommendations.
           </p>
         ) : isRecommendationsLoading && recommendedTracks.length === 0 ? (
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
-            Loading recommendations...
-          </p>
+          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">Loading recommendations...</p>
         ) : recommendedTracks.length === 0 ? (
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
-            No more recommendations right now.
-          </p>
+          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">No more recommendations right now.</p>
         ) : (
           <div className="mt-4 -mx-1 snap-x snap-mandatory overflow-x-auto pb-2 scroll-smooth">
             <div className="mx-auto flex w-fit min-w-max gap-4 px-1">
@@ -270,6 +257,7 @@ export default function SearchSuggestSection({
                 const suggested = isCollaborative && isTrackSuggested(track.provider_track_id)
                 const disableAccept =
                   isRecommendationActionPending ||
+                  isRecommendationsLoading ||
                   isSuggestPending ||
                   inPlaylist ||
                   suggested
@@ -326,35 +314,35 @@ export default function SearchSuggestSection({
                           {track.title}
                         </a>
                       ) : (
-                        <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
-                          {track.title}
-                        </p>
+                        <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
                       )}
                       <p className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                         {track.artist || 'Unknown artist'}
                       </p>
                     </div>
                     <div className="mt-3 flex items-center justify-center gap-2">
-                      <button
+                      <AppButton
                         type="button"
+                        intent="icon"
                         onClick={() => onAcceptRecommendation(track)}
                         title={isCollaborative ? 'Suggest track' : 'Add track'}
                         aria-label={isCollaborative ? 'Suggest track' : 'Add track'}
                         disabled={disableAccept}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-300 bg-emerald-50/70 text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        color="emerald"
                       >
                         <RiThumbUpLine className="h-5 w-5" />
-                      </button>
-                      <button
+                      </AppButton>
+                      <AppButton
                         type="button"
+                        intent="icon"
                         onClick={() => onDeclineRecommendation(track)}
                         title="Decline recommendation"
                         aria-label="Decline recommendation"
                         disabled={isRecommendationActionPending || isRecommendationsLoading}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-300 bg-rose-50/70 text-rose-600 transition hover:border-rose-400 hover:bg-rose-100/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        color="rose"
                       >
                         <RiThumbDownLine className="h-5 w-5" />
-                      </button>
+                      </AppButton>
                     </div>
                     {inPlaylist ? (
                       <p className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">In playlist</p>
@@ -368,7 +356,11 @@ export default function SearchSuggestSection({
           </div>
         )}
       </div>
-      {recommendationsStatus ? <p className="mt-3 text-xs text-rose-500">{recommendationsStatus}</p> : null}
+      {recommendationsStatus ? (
+        <StatusCallout tone="error" title="Recommendations status" className="mt-3">
+          {recommendationsStatus}
+        </StatusCallout>
+      ) : null}
     </SurfaceCard>
   )
 }

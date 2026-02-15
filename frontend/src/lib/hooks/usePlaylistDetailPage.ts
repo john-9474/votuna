@@ -59,8 +59,8 @@ export function usePlaylistDetailPage(
         authRequired: true,
       }),
     enabled: Boolean(playlistId && isPlaylistTabActive),
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 120_000,
+    staleTime: 30_000,
   })
 
   const membersQuery = useQuery({

@@ -1,9 +1,10 @@
-import { Button } from '@tremor/react'
 import { RiCloseLine } from '@remixicon/react'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
+import AppButton from '@/components/ui/AppButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
 import TrackArtwork from './TrackArtwork'
@@ -35,9 +36,6 @@ const formatAddedDate = (addedAt: string | null | undefined) => {
   if (Number.isNaN(date.getTime())) return 'Added date unavailable'
   return `Added ${date.toLocaleDateString()}`
 }
-
-const destructiveActionButtonClass =
-  'inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-200 text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60'
 
 const INITIAL_VISIBLE_TRACKS = 80
 const VISIBLE_TRACKS_STEP = 80
@@ -99,9 +97,7 @@ export default function TracksSection({
                         {track.title}
                       </a>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
-                        {track.title}
-                      </p>
+                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
                     )}
                     <p className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                       {track.artist || 'Unknown artist'}
@@ -125,7 +121,8 @@ export default function TracksSection({
                   </div>
                   <div className="flex items-center gap-2">
                     {track.url ? (
-                      <Button
+                      <AppButton
+                        intent="secondary"
                         onClick={() =>
                           onPlayTrack({
                             key: `track-${track.provider_track_id}`,
@@ -135,34 +132,30 @@ export default function TracksSection({
                             artworkUrl: track.artwork_url,
                           })
                         }
-                        variant="secondary"
-                        className="w-24 justify-center rounded-full"
+                        className="w-24 justify-center"
                       >
                         Play
-                      </Button>
+                      </AppButton>
                     ) : null}
                     {canRemoveTracks ? (
-                      <button
-                        type="button"
+                      <AppButton
+                        intent="icon"
                         aria-label={`Remove ${track.title}`}
                         disabled={isRemoveTrackPending}
                         onClick={() => {
                           if (typeof window !== 'undefined') {
-                            const confirmed = window.confirm(
-                              `Remove "${track.title}" from this playlist?`,
-                            )
+                            const confirmed = window.confirm(`Remove "${track.title}" from this playlist?`)
                             if (!confirmed) return
                           }
                           onRemoveTrack(track.provider_track_id)
                         }}
-                        className={destructiveActionButtonClass}
                       >
                         {isRemoveTrackPending && removingTrackId === track.provider_track_id ? (
                           '...'
                         ) : (
                           <RiCloseLine className="h-4 w-4" />
                         )}
-                      </button>
+                      </AppButton>
                     ) : null}
                   </div>
                 </div>
@@ -171,18 +164,23 @@ export default function TracksSection({
           ))}
           {remainingCount > 0 ? (
             <div className="flex justify-center pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setVisibleCount((prev) => Math.min(tracks.length, prev + VISIBLE_TRACKS_STEP))}
-                className="rounded-full"
+              <AppButton
+                intent="secondary"
+                onClick={() =>
+                  setVisibleCount((prev) => Math.min(tracks.length, prev + VISIBLE_TRACKS_STEP))
+                }
               >
                 Show {Math.min(VISIBLE_TRACKS_STEP, remainingCount)} more
-              </Button>
+              </AppButton>
             </div>
           ) : null}
         </div>
       )}
-      {statusMessage ? <p className="mt-3 text-xs text-rose-500">{statusMessage}</p> : null}
+      {statusMessage ? (
+        <StatusCallout tone="error" title="Track action" className="mt-3">
+          {statusMessage}
+        </StatusCallout>
+      ) : null}
     </SurfaceCard>
   )
 }

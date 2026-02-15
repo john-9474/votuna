@@ -1,9 +1,11 @@
+import { Card, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from '@tremor/react'
 import { useEffect, useMemo, useState } from 'react'
 
-import PrimaryButton from '@/components/ui/PrimaryButton'
+import AppButton from '@/components/ui/AppButton'
+import StatusCallout from '@/components/ui/StatusCallout'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
 
-const REVIEW_TRACKS_PAGE_SIZE = 12
+const REVIEW_TRACKS_PAGE_SIZE = 10
 
 type ReviewRunPanelProps = {
   sourceLabel: string
@@ -45,7 +47,7 @@ export default function ReviewRunPanel({
   }, [trackPage, totalTrackPages])
 
   return (
-    <div className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+    <Card className="p-5">
       <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
         Review and copy
       </p>
@@ -54,40 +56,42 @@ export default function ReviewRunPanel({
       </p>
 
       <div className="mt-4">
-        <PrimaryButton
+        <AppButton
           onClick={review.run}
           disabled={!review.canRun || review.isRunning}
           className="w-full justify-center"
         >
           {review.isRunning ? 'Copying...' : 'Copy songs'}
-        </PrimaryButton>
+        </AppButton>
       </div>
 
       {review.isUpdating ? (
-        <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">Updating review...</p>
+        <StatusCallout tone="info" title="Updating" className="mt-3">
+          Updating review...
+        </StatusCallout>
       ) : null}
 
       {review.error ? (
-        <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
-          <p>{review.error}</p>
-          {review.error.includes('500') ? (
-            <p className="mt-1">Narrow your selection to 500 songs or fewer.</p>
-          ) : null}
-        </div>
+        <StatusCallout tone="error" title="Review failed" className="mt-3">
+          {review.error}
+          {review.error.includes('500') ? ' Narrow your selection to 500 songs or fewer.' : ''}
+        </StatusCallout>
       ) : null}
 
       {!review.error && review.status === 'idle' && review.idleMessage ? (
-        <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">{review.idleMessage}</p>
+        <StatusCallout tone="info" title="Review status" className="mt-3">
+          {review.idleMessage}
+        </StatusCallout>
       ) : null}
 
       {!review.isFresh && review.data ? (
-        <p className="mt-3 text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+        <StatusCallout tone="warning" title="Refresh needed" className="mt-3">
           Choices changed. Updating review before copy.
-        </p>
+        </StatusCallout>
       ) : null}
 
       {review.data ? (
-        <div className="mt-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.9)] p-4">
+        <Card className="mt-4 p-4">
           <div className="grid gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.65)] sm:grid-cols-3">
             <p>Songs found: {review.data.matched_count}</p>
             <p>Songs to copy: {review.data.to_add_count}</p>
@@ -97,85 +101,84 @@ export default function ReviewRunPanel({
             Max songs per action: {review.data.max_tracks_per_action}
           </p>
           {review.data.matched_sample.length > 0 ? (
-            <div className="mt-3 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)]">
-              <div className="max-h-72 overflow-auto">
-                <table className="w-full table-fixed border-separate border-spacing-0 text-xs">
-                  <thead>
-                    <tr className="text-left text-[color:rgb(var(--votuna-ink)/0.55)]">
-                      <th className="sticky top-0 z-10 bg-[rgb(var(--votuna-paper))] px-3 py-2 font-semibold">
-                        Song
-                      </th>
-                      <th className="sticky top-0 z-10 bg-[rgb(var(--votuna-paper))] px-3 py-2 font-semibold">
-                        Artist
-                      </th>
-                      <th className="sticky top-0 z-10 bg-[rgb(var(--votuna-paper))] px-3 py-2 font-semibold">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+            <div className="mt-3">
+              <div className="rounded-xl border border-[color:rgb(var(--votuna-ink)/0.08)]">
+                <Table style={{ tableLayout: 'fixed' }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeaderCell className="w-[40%] !whitespace-normal">Song</TableHeaderCell>
+                      <TableHeaderCell className="w-[32%] !whitespace-normal">Artist</TableHeaderCell>
+                      <TableHeaderCell className="w-[28%] !whitespace-normal !px-3">Status</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
                     {pagedTracks.map((track) => {
                       const isDuplicate = duplicateTrackIdSet.has(track.provider_track_id)
                       return (
-                        <tr
-                          key={`matched-${track.provider_track_id}`}
-                          className="border-t border-[color:rgb(var(--votuna-ink)/0.06)] text-[color:rgb(var(--votuna-ink)/0.7)]"
-                        >
-                          <td className="truncate px-3 py-2" title={track.title}>
-                            {track.title}
-                          </td>
-                          <td className="truncate px-3 py-2" title={track.artist || 'Unknown artist'}>
-                            {track.artist || 'Unknown artist'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {isDuplicate ? (
-                              <span className="rounded-full bg-[rgba(var(--votuna-ink),0.08)] px-2 py-0.5 text-[10px] font-semibold text-[color:rgb(var(--votuna-ink)/0.72)]">
-                                Duplicate
-                              </span>
-                            ) : (
-                              <span className="rounded-full bg-[rgba(var(--votuna-accent-soft),0.65)] px-2 py-0.5 text-[10px] font-semibold text-[rgb(var(--votuna-ink))]">
-                                Will copy
-                              </span>
-                            )}
-                          </td>
-                        </tr>
+                        <TableRow key={`matched-${track.provider_track_id}`}>
+                          <TableCell className="align-top !whitespace-normal">
+                            <span className="block truncate" title={track.title}>
+                              {track.title}
+                            </span>
+                          </TableCell>
+                          <TableCell className="align-top !whitespace-normal">
+                            <span className="block truncate" title={track.artist || 'Unknown artist'}>
+                              {track.artist || 'Unknown artist'}
+                            </span>
+                          </TableCell>
+                          <TableCell className="align-top !whitespace-normal !px-3">
+                            <span
+                              className={
+                                isDuplicate
+                                  ? 'inline-flex h-8 w-full max-w-[6.75rem] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[color:rgb(var(--votuna-ink)/0.24)] px-2 text-xs font-semibold leading-none text-[color:rgb(var(--votuna-ink)/0.82)]'
+                                  : 'inline-flex h-8 w-full max-w-[6.75rem] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-emerald-500/60 px-2 text-xs font-semibold leading-none text-emerald-600 dark:text-emerald-400'
+                              }
+                            >
+                              {isDuplicate ? 'Duplicate' : 'Will copy'}
+                            </span>
+                          </TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
-              <div className="flex items-center justify-between border-t border-[color:rgb(var(--votuna-ink)/0.08)] px-3 py-2 text-[11px] text-[color:rgb(var(--votuna-ink)/0.58)]">
+              <div className="flex items-center justify-between pt-3 text-[11px] text-[color:rgb(var(--votuna-ink)/0.58)]">
                 <p>
                   Showing {pageRangeStart}-{pageRangeEnd} of {matchedTracks.length}
                 </p>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
+                  <AppButton
+                    intent="ghost"
+                    size="xs"
                     disabled={!canGoPrev}
                     onClick={() => setTrackPage((prev) => Math.max(prev - 1, 0))}
-                    className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-[11px] disabled:opacity-50"
                   >
                     Previous
-                  </button>
-                  <button
-                    type="button"
+                  </AppButton>
+                  <AppButton
+                    intent="ghost"
+                    size="xs"
                     disabled={!canGoNext}
                     onClick={() => setTrackPage((prev) => prev + 1)}
-                    className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-[11px] disabled:opacity-50"
                   >
                     Next
-                  </button>
+                  </AppButton>
                 </div>
               </div>
             </div>
           ) : null}
-        </div>
+        </Card>
       ) : null}
 
-      {review.runError ? <p className="mt-3 text-xs text-rose-500">{review.runError}</p> : null}
+      {review.runError ? (
+        <StatusCallout tone="error" title="Copy failed" className="mt-3">
+          {review.runError}
+        </StatusCallout>
+      ) : null}
 
       {review.runResult ? (
-        <div className="mt-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.9)] p-4">
+        <Card className="mt-4 p-4">
           <p className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Copy result</p>
           <div className="mt-2 grid gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.65)] sm:grid-cols-2">
             <p>Songs found: {review.runResult.matched_count}</p>
@@ -184,16 +187,21 @@ export default function ReviewRunPanel({
             <p>Could not copy: {review.runResult.failed_count}</p>
           </div>
           {review.runResult.failed_items.length > 0 ? (
-            <ul className="mt-3 space-y-1 text-xs text-rose-500">
-              {review.runResult.failed_items.map((item, index) => (
-                <li key={`failed-${item.provider_track_id}`}>
-                  Song {index + 1}: {item.error}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-3">
+              <StatusCallout tone="error" title="Failed items">
+                Some songs could not be copied.
+              </StatusCallout>
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-rose-600">
+                {review.runResult.failed_items.map((item, index) => (
+                  <li key={`failed-${item.provider_track_id}`}>
+                    Song {index + 1}: {item.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
-        </div>
+        </Card>
       ) : null}
-    </div>
+    </Card>
   )
 }

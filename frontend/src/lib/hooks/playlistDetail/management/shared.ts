@@ -16,7 +16,7 @@ export type ManagementCounterpartyOption = {
   ref: ManagementPlaylistRef
 }
 
-export const MANAGEMENT_SOURCE_TRACK_LIMIT = 50
+export const MANAGEMENT_SOURCE_TRACK_LIMIT = 10
 
 export type ManagementAction = 'add_to_this_playlist' | 'copy_to_another_playlist'
 export type ManagementSongScope = ManagementSelectionMode

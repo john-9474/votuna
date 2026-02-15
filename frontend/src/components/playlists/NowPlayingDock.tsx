@@ -1,3 +1,4 @@
+import AppButton from '@/components/ui/AppButton'
 import type { PlayerTrack } from '@/lib/types/votuna'
 
 import TrackArtwork from './TrackArtwork'
@@ -33,9 +34,7 @@ export default function NowPlayingDock({ track, onClose }: NowPlayingDockProps) 
               <p className="text-[10px] uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
                 Now Playing
               </p>
-              <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
-                {track.title}
-              </p>
+              <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
               <p className="truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                 {track.artist || 'Unknown artist'}
               </p>
@@ -50,13 +49,9 @@ export default function NowPlayingDock({ track, onClose }: NowPlayingDockProps) 
             >
               Open
             </a>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex w-24 justify-center rounded-full bg-[rgb(var(--votuna-ink))] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
-            >
+            <AppButton onClick={onClose} className="w-24 justify-center">
               Close
-            </button>
+            </AppButton>
           </div>
         </div>
         {shouldShowSoundcloudEmbed ? (

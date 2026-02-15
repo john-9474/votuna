@@ -32,8 +32,8 @@ export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePl
         authRequired: true,
       }),
     enabled: Boolean(playlistId && canInvite),
-    staleTime: 10_000,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 120_000,
   })
 
   const searchCandidatesMutation = useMutation({

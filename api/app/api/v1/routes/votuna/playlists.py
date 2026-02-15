@@ -11,6 +11,7 @@ from app.api.v1.routes.votuna.common import (
     get_provider_client,
     has_collaborators,
     raise_provider_auth,
+    raise_provider_api_error,
     require_member,
     require_owner,
 )
@@ -207,7 +208,8 @@ async def sync_votuna_playlist(
     except ProviderAuthError:
         raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     updated = votuna_playlist_crud.update(
         db,
         playlist,
@@ -392,7 +394,8 @@ async def list_votuna_tracks(
     except ProviderAuthError:
         raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
 
     track_ids = [track.provider_track_id for track in tracks if track.provider_track_id]
     latest_additions_by_track = votuna_track_addition_crud.list_latest_for_tracks(

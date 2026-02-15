@@ -1,5 +1,9 @@
+import { Badge } from '@tremor/react'
+
+import ClearableTextInput from '@/components/ui/ClearableTextInput'
+import AppButton from '@/components/ui/AppButton'
+import StatusCallout from '@/components/ui/StatusCallout'
 import { hasValue } from '@/lib/hooks/playlistDetail/management/shared'
-import ClearableInput from '@/components/ui/ClearableInput'
 
 type FacetSelectorProps = {
   label: string
@@ -30,12 +34,10 @@ export default function FacetSelector({
 }: FacetSelectorProps) {
   return (
     <div className="space-y-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
-        {label}
-      </p>
+      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">{label}</p>
 
       <div className="flex gap-2">
-        <ClearableInput
+        <ClearableTextInput
           value={customInput}
           onValueChange={onCustomInputChange}
           containerClassName="flex-1"
@@ -45,70 +47,68 @@ export default function FacetSelector({
               onAddCustomValue()
             }
           }}
-          className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.92)] px-4 py-2 text-sm"
           placeholder={customPlaceholder}
           clearAriaLabel={`Clear ${label.toLowerCase()} input`}
         />
-        <button
-          type="button"
-          onClick={onAddCustomValue}
-          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.16)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))]"
-        >
+        <AppButton intent="secondary" onClick={onAddCustomValue}>
           Add
-        </button>
+        </AppButton>
       </div>
 
       {selectedValues.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedValues.map((value) => (
-            <button
-              key={`selected-${value.toLowerCase()}`}
-              type="button"
-              onClick={() => onRemoveValue(value)}
-              className="rounded-full bg-[rgb(var(--votuna-ink))] px-3 py-1.5 text-xs font-semibold text-[rgb(var(--votuna-paper))]"
-            >
-              {value} x
-            </button>
+            <div key={`selected-${value.toLowerCase()}`} className="flex items-center gap-1">
+              <Badge color="gray">{value}</Badge>
+              <AppButton
+                intent="icon"
+                size="xs"
+                aria-label={`Remove ${value}`}
+                onClick={() => onRemoveValue(value)}
+              >
+                x
+              </AppButton>
+            </div>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+        <StatusCallout tone="info" title={`No ${label.toLowerCase()}`}>
           No {label.toLowerCase()} selected yet.
-        </p>
+        </StatusCallout>
       )}
 
-      {status ? <p className="text-xs text-rose-500">{status}</p> : null}
+      {status ? (
+        <StatusCallout tone="error" title={`${label} status`}>
+          {status}
+        </StatusCallout>
+      ) : null}
       {isLoading ? (
-        <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">Loading suggestions...</p>
+        <StatusCallout tone="info" title="Loading suggestions">
+          Loading suggestions...
+        </StatusCallout>
       ) : suggestions.length > 0 ? (
         <div>
-          <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
-            Suggested from source playlist
-          </p>
+          <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">Suggested from source playlist</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {suggestions.map((item) => {
               const selected = hasValue(selectedValues, item.value)
               return (
-                <button
+                <AppButton
                   key={`${item.value.toLowerCase()}-${item.count}`}
-                  type="button"
+                  intent={selected ? 'primary' : 'secondary'}
+                  size="xs"
                   onClick={() => onToggleSuggestion(item.value)}
-                  className={`rounded-full border px-3 py-1.5 text-xs ${
-                    selected
-                      ? 'border-transparent bg-[rgba(var(--votuna-accent-soft),0.8)] font-semibold text-[rgb(var(--votuna-ink))]'
-                      : 'border-[color:rgb(var(--votuna-ink)/0.16)] text-[color:rgb(var(--votuna-ink)/0.75)]'
-                  }`}
                 >
                   {item.value} ({item.count})
-                </button>
+                </AppButton>
               )
             })}
           </div>
         </div>
       ) : (
-        <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+        <StatusCallout tone="info" title="No suggestions">
           No suggestions available for this source playlist. You can still add custom values.
-        </p>
+        </StatusCallout>
       )}
     </div>
   )

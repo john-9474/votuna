@@ -1,7 +1,11 @@
+import { Card, Select, SelectItem, Switch, Tab, TabGroup, TabList } from '@tremor/react'
+
+import ClearableInput from '@/components/ui/ClearableInput'
+import AppButton from '@/components/ui/AppButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
-import ClearableInput from '@/components/ui/ClearableInput'
 
 import FacetSelector from './FacetSelector'
 import PlaylistGridPicker from './PlaylistGridPicker'
@@ -10,6 +14,13 @@ import ReviewRunPanel from './ReviewRunPanel'
 type MergingBulkEditingSectionProps = {
   management: PlaylistManagementState
 }
+
+const SONG_SCOPE_OPTIONS: Array<{ value: PlaylistManagementState['songScope']['value']; label: string }> = [
+  { value: 'all', label: 'All songs' },
+  { value: 'genre', label: 'Only specific genres' },
+  { value: 'artist', label: 'Only specific artists' },
+  { value: 'songs', label: 'Pick songs manually' },
+]
 
 export default function MergingBulkEditingSection({ management }: MergingBulkEditingSectionProps) {
   const { action, playlists, songScope, steps } = management
@@ -30,49 +41,63 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
     sourceTrackTotalCount === 0
       ? 0
       : Math.min(sourceTrackOffset + sourceTrackLimit, sourceTrackTotalCount)
+  const visibleTrackIds = sourcePicker.tracks.map((track) => track.provider_track_id)
+  const selectedVisibleTrackCount = visibleTrackIds.reduce(
+    (count, trackId) => count + (selectedSongIdSet.has(trackId) ? 1 : 0),
+    0,
+  )
+  const allVisibleTracksSelected =
+    visibleTrackIds.length > 0 && selectedVisibleTrackCount === visibleTrackIds.length
+
+  const toggleVisibleTracksSelection = () => {
+    if (allVisibleTracksSelected) {
+      for (const trackId of visibleTrackIds) {
+        if (selectedSongIdSet.has(trackId)) {
+          sourcePicker.toggleSelectedSong(trackId)
+        }
+      }
+      return
+    }
+    for (const trackId of visibleTrackIds) {
+      if (!selectedSongIdSet.has(trackId)) {
+        sourcePicker.toggleSelectedSong(trackId)
+      }
+    }
+  }
+
+  const actionTabIndex = action.value === 'add_to_this_playlist' ? 0 : 1
+  const sourceModeTabIndex = playlists.otherPlaylist.sourceMode === 'my_playlists' ? 0 : 1
+  const destinationModeTabIndex = playlists.destination.mode === 'existing' ? 0 : 1
 
   return (
     <SurfaceCard>
       <SectionEyebrow>Merging</SectionEyebrow>
-      <div className="mt-2">
-        <h3 className="text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-          Copy songs between playlists
-        </h3>
-      </div>
+      <h3 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">Copy songs between playlists</h3>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)]">
         <div className="space-y-5">
-          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+          <Card className="p-5">
             <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
               What do you want to do?
             </p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => action.setValue('add_to_this_playlist')}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
-                  action.value === 'add_to_this_playlist'
-                    ? 'border-transparent bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                    : 'border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]'
-                }`}
-              >
-                Add songs to this playlist
-              </button>
-              <button
-                type="button"
-                onClick={() => action.setValue('copy_to_another_playlist')}
-                className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold ${
-                  action.value === 'copy_to_another_playlist'
-                    ? 'border-transparent bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                    : 'border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]'
-                }`}
-              >
-                Copy songs to another playlist
-              </button>
-            </div>
-          </section>
+            <TabGroup
+              index={actionTabIndex}
+              onIndexChange={(index) =>
+                action.setValue(index === 0 ? 'add_to_this_playlist' : 'copy_to_another_playlist')
+              }
+            >
+              <TabList variant="solid" className="mt-3">
+                <Tab className="border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]">
+                  Add songs to this playlist
+                </Tab>
+                <Tab className="border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]">
+                  Copy songs to another playlist
+                </Tab>
+              </TabList>
+            </TabGroup>
+          </Card>
 
-          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+          <Card className="p-5">
             <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
               Choose playlists
             </p>
@@ -82,30 +107,17 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                 <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
                   Pick the playlist to copy songs from.
                 </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => playlists.otherPlaylist.setSourceMode('my_playlists')}
-                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                      playlists.otherPlaylist.sourceMode === 'my_playlists'
-                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
-                    }`}
-                  >
-                    My playlists
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => playlists.otherPlaylist.setSourceMode('search_playlists')}
-                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                      playlists.otherPlaylist.sourceMode === 'search_playlists'
-                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
-                    }`}
-                  >
-                    Search playlists
-                  </button>
-                </div>
+                <TabGroup
+                  index={sourceModeTabIndex}
+                  onIndexChange={(index) =>
+                    playlists.otherPlaylist.setSourceMode(index === 0 ? 'my_playlists' : 'search_playlists')
+                  }
+                >
+                  <TabList variant="solid">
+                    <Tab>My playlists</Tab>
+                    <Tab>Search playlists</Tab>
+                  </TabList>
+                </TabGroup>
 
                 {playlists.otherPlaylist.sourceMode === 'search_playlists' ? (
                   <div className="space-y-2">
@@ -126,26 +138,27 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         value={playlists.otherPlaylist.search.input}
                         onValueChange={playlists.otherPlaylist.search.setInput}
                         containerClassName="flex-1"
-                        className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                         placeholder="Search playlists or paste a playlist link"
                         clearAriaLabel="Clear playlist search"
                       />
-                      <button
+                      <AppButton
+                        intent="secondary"
                         type="submit"
                         disabled={
                           playlists.otherPlaylist.search.isPending ||
                           !playlists.otherPlaylist.search.input.trim()
                         }
-                        className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-4 py-2 text-xs font-semibold disabled:opacity-60"
                       >
                         {playlists.otherPlaylist.search.isPending ? 'Searching...' : 'Search'}
-                      </button>
+                      </AppButton>
                     </form>
                     <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
                       Enter playlist text to search, or paste a playlist URL.
                     </p>
                     {playlists.otherPlaylist.search.status ? (
-                      <p className="text-xs text-rose-500">{playlists.otherPlaylist.search.status}</p>
+                      <StatusCallout tone="error" title="Search status" className="mt-2">
+                        {playlists.otherPlaylist.search.status}
+                      </StatusCallout>
                     ) : null}
                   </div>
                 ) : null}
@@ -163,30 +176,17 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
               </div>
             ) : (
               <div className="mt-3 space-y-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => playlists.destination.setMode('existing')}
-                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                      playlists.destination.mode === 'existing'
-                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
-                    }`}
-                  >
-                    Existing playlist
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => playlists.destination.setMode('create')}
-                    className={`rounded-full px-4 py-2 text-xs font-semibold ${
-                      playlists.destination.mode === 'create'
-                        ? 'bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))]'
-                        : 'border border-[color:rgb(var(--votuna-ink)/0.14)]'
-                    }`}
-                  >
-                    Create new playlist
-                  </button>
-                </div>
+                <TabGroup
+                  index={destinationModeTabIndex}
+                  onIndexChange={(index) =>
+                    playlists.destination.setMode(index === 0 ? 'existing' : 'create')
+                  }
+                >
+                  <TabList variant="solid">
+                    <Tab>Existing playlist</Tab>
+                    <Tab>Create new playlist</Tab>
+                  </TabList>
+                </TabGroup>
 
                 {!playlists.destination.isCreatingNew ? (
                   <div>
@@ -209,7 +209,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       <ClearableInput
                         value={playlists.destination.createForm.title}
                         onValueChange={playlists.destination.createForm.setTitle}
-                        className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        className="mt-2"
                         placeholder="Playlist name"
                         clearAriaLabel="Clear playlist name"
                       />
@@ -221,18 +221,15 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       <ClearableInput
                         value={playlists.destination.createForm.description}
                         onValueChange={playlists.destination.createForm.setDescription}
-                        className="mt-2 w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
+                        className="mt-2"
                         placeholder="Optional description"
                         clearAriaLabel="Clear playlist description"
                       />
                     </div>
                     <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)] sm:col-span-2">
-                      <input
-                        type="checkbox"
+                      <Switch
                         checked={playlists.destination.createForm.isPublic}
-                        onChange={(event) =>
-                          playlists.destination.createForm.setIsPublic(event.target.checked)
-                        }
+                        onChange={playlists.destination.createForm.setIsPublic}
                       />
                       Create as public playlist
                     </label>
@@ -240,28 +237,28 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                 )}
               </div>
             )}
-          </section>
+          </Card>
 
-          <section className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.82)] p-5">
+          <Card className="p-5">
             <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
               Choose songs
             </p>
             {!steps.canProceedFromPlaylists ? (
-              <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+              <StatusCallout tone="info" title="Selection required" className="mt-3">
                 Choose playlists first to load song options.
-              </p>
+              </StatusCallout>
             ) : (
               <div className="mt-3 space-y-4">
-                <select
+                <Select
                   value={songScope.value}
-                  onChange={(event) => songScope.setValue(event.target.value as typeof songScope.value)}
-                  className="votuna-select w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm text-[rgb(var(--votuna-ink))]"
+                  onValueChange={(value) => songScope.setValue(value as typeof songScope.value)}
                 >
-                  <option value="all">All songs</option>
-                  <option value="genre">Only specific genres</option>
-                  <option value="artist">Only specific artists</option>
-                  <option value="songs">Pick songs manually</option>
-                </select>
+                  {SONG_SCOPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </Select>
 
                 {songScope.value === 'genre' ? (
                   <FacetSelector
@@ -308,7 +305,6 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         <ClearableInput
                           value={sourcePicker.search}
                           onValueChange={sourcePicker.setSearch}
-                          className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-4 py-2 text-sm"
                           placeholder="Search songs in source playlist"
                           clearAriaLabel="Clear source song search"
                         />
@@ -316,7 +312,9 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                     </div>
 
                     {sourcePicker.status ? (
-                      <p className="text-xs text-rose-500">{sourcePicker.status}</p>
+                      <StatusCallout tone="error" title="Song search status">
+                        {sourcePicker.status}
+                      </StatusCallout>
                     ) : null}
 
                     {sourcePicker.isLoading ? (
@@ -327,6 +325,14 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       </p>
                     ) : (
                       <div className="space-y-2">
+                        <label className="inline-flex items-center gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.62)]">
+                          <input
+                            type="checkbox"
+                            checked={allVisibleTracksSelected}
+                            onChange={toggleVisibleTracksSelection}
+                          />
+                          {allVisibleTracksSelected ? 'Unselect all on this page' : 'Select all on this page'}
+                        </label>
                         {sourcePicker.tracks.map((track) => (
                           <label
                             key={track.provider_track_id}
@@ -356,31 +362,31 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         Showing {rangeStart}-{rangeEnd} of {sourceTrackTotalCount}
                       </p>
                       <div className="flex gap-2">
-                        <button
-                          type="button"
+                        <AppButton
+                          intent="ghost"
+                          size="xs"
                           disabled={!canPageBack}
                           onClick={() =>
                             setSourceTrackOffset(Math.max(0, sourceTrackOffset - sourceTrackLimit))
                           }
-                          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-xs disabled:opacity-50"
                         >
                           Previous
-                        </button>
-                        <button
-                          type="button"
+                        </AppButton>
+                        <AppButton
+                          intent="ghost"
+                          size="xs"
                           disabled={!canPageForward}
                           onClick={() => setSourceTrackOffset(nextOffset)}
-                          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.14)] px-3 py-1 text-xs disabled:opacity-50"
                         >
                           Next
-                        </button>
+                        </AppButton>
                       </div>
                     </div>
                   </div>
                 ) : null}
               </div>
             )}
-          </section>
+          </Card>
         </div>
 
         <div>

@@ -1,12 +1,13 @@
 'use client'
 
 import { Menu } from '@headlessui/react'
-import { Button, Dialog, DialogPanel } from '@tremor/react'
+import { Dialog, DialogPanel } from '@tremor/react'
 import { useQueryClient } from '@tanstack/react-query'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import AppButton from '@/components/ui/AppButton'
 import UserAvatar from '@/components/ui/UserAvatar'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { User } from '@/lib/types/user'
@@ -166,12 +167,12 @@ export default function Navbar() {
               </Menu.Items>
             </Menu>
           ) : (
-            <Button
+            <AppButton
               onClick={() => setLoginOpen(true)}
               className="rounded-full bg-[rgb(var(--votuna-ink))] px-5 py-2 text-sm font-semibold text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
             >
               {loading ? 'Checking session...' : 'Log in'}
-            </Button>
+            </AppButton>
           )}
         </div>
       </div>
@@ -190,27 +191,29 @@ export default function Navbar() {
                 Connect a provider to continue.
               </p>
             </div>
-            <button
+            <AppButton
+              intent="ghost"
               onClick={() => setLoginOpen(false)}
-              className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] px-3 py-1 text-xs text-[color:rgb(var(--votuna-ink)/0.5)] transition hover:border-[color:rgb(var(--votuna-ink)/0.2)] hover:text-[color:rgb(var(--votuna-ink)/0.8)]"
             >
               Close
-            </button>
+            </AppButton>
           </div>
 
           <div className="mt-6 space-y-3">
-            <Button
+            <AppButton
+              intent="secondary"
               onClick={handleSpotifyLogin}
               className="w-full justify-center rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.14)] bg-[rgba(var(--votuna-paper),0.95)] text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.85)]"
             >
               Continue with Spotify
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
+              color="orange"
               onClick={handleSoundcloudLogin}
               className="w-full justify-center rounded-2xl bg-[rgb(var(--votuna-accent))] text-white hover:bg-orange-600"
             >
               Continue with SoundCloud
-            </Button>
+            </AppButton>
           </div>
         </DialogPanel>
       </Dialog>

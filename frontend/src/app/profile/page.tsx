@@ -1,6 +1,6 @@
 'use client'
 
-import { Select, SelectItem } from '@tremor/react'
+import { Select, SelectItem, Switch } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
@@ -10,6 +10,7 @@ import { queryKeys } from '@/lib/constants/queryKeys'
 import PageShell from '@/components/ui/PageShell'
 import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import UserAvatar from '@/components/ui/UserAvatar'
 import { apiJson, API_URL } from '@/lib/api'
@@ -381,18 +382,18 @@ export default function ProfilePage() {
             <div>
               <SectionEyebrow className="tracking-[0.2em]">Emails</SectionEyebrow>
               <label className="mt-3 flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                <input
-                  type="checkbox"
+                <Switch
                   checked={settingsForm.receive_emails}
-                  onChange={(event) => updateSettingsField('receive_emails', event.target.checked)}
-                  className="h-5 w-5 rounded border-[color:rgb(var(--votuna-ink)/0.2)] text-[rgb(var(--votuna-accent))]"
+                  onChange={(checked) => updateSettingsField('receive_emails', checked)}
                 />
                 Receive product updates and notifications.
               </label>
             </div>
           </div>
           {settingsStatus ? (
-            <p className="mt-4 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">{settingsStatus}</p>
+            <StatusCallout tone="info" title="Settings status" className="mt-4">
+              {settingsStatus}
+            </StatusCallout>
           ) : null}
           {settingsQuery.isLoading ? (
             <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">Loading settings...</p>

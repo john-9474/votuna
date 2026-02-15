@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Card } from '@tremor/react'
+import { Switch } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
@@ -8,7 +8,10 @@ import { queryKeys } from '@/lib/constants/queryKeys'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { getProviderPlaylistUrl } from '@/lib/providerLinks'
 import type { PendingInvite, VotunaPlaylist } from '@/lib/types/votuna'
+import AppButton from '@/components/ui/AppButton'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
+import StatusCallout from '@/components/ui/StatusCallout'
+import SurfaceCard from '@/components/ui/SurfaceCard'
 import { apiFetch, apiJson, ApiError } from '../lib/api'
 
 type ProviderPlaylist = {
@@ -158,7 +161,7 @@ function Landing() {
         </div>
 
         <div className="fade-up-delay lg:w-2/5">
-          <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+          <SurfaceCard>
             <div className="space-y-6">
               <div>
                 <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
@@ -177,12 +180,12 @@ function Landing() {
                 ))}
               </ul>
             </div>
-          </Card>
+          </SurfaceCard>
         </div>
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-6 pb-16 pt-8">
-        <Card className="fade-up-delay rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+        <SurfaceCard className="fade-up-delay">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
@@ -211,9 +214,9 @@ function Landing() {
               </div>
             ))}
           </div>
-        </Card>
+        </SurfaceCard>
 
-        <Card className="fade-up-delay-lg mt-6 rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+        <SurfaceCard className="fade-up-delay-lg mt-6">
           <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
             How it works
           </p>
@@ -230,9 +233,9 @@ function Landing() {
               </li>
             ))}
           </ol>
-        </Card>
+        </SurfaceCard>
 
-        <Card className="fade-up-delay-lg mt-6 rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+        <SurfaceCard className="fade-up-delay-lg mt-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
@@ -265,7 +268,7 @@ function Landing() {
               </div>
             ))}
           </div>
-        </Card>
+        </SurfaceCard>
 
         
       </div>
@@ -292,15 +295,15 @@ export default function Home() {
     queryFn: () =>
       apiJson<ProviderPlaylist[]>(`/api/v1/playlists/providers/${activeProvider}`, { authRequired: true }),
     enabled: !!user?.id && !!activeProvider,
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    refetchInterval: 180_000,
+    staleTime: 60_000,
   })
 
   const votunaQuery = useQuery({
     queryKey: queryKeys.votunaPlaylists,
     queryFn: () => apiJson<VotunaPlaylist[]>('/api/v1/votuna/playlists', { authRequired: true }),
     enabled: !!user?.id,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 10_000,
   })
 
@@ -308,7 +311,7 @@ export default function Home() {
     queryKey: queryKeys.votunaPendingInvites,
     queryFn: () => apiJson<PendingInvite[]>('/api/v1/votuna/invites/pending', { authRequired: true }),
     enabled: !!user?.id,
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
     staleTime: 10_000,
   })
 
@@ -456,9 +459,9 @@ export default function Home() {
   if (userQuery.isLoading) {
     return (
       <main className="mx-auto w-full max-w-6xl px-6 pt-6 pb-16">
-        <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+        <SurfaceCard>
           <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading session...</p>
-        </Card>
+        </SurfaceCard>
       </main>
     )
   }
@@ -489,7 +492,7 @@ export default function Home() {
           </h1>
         </div>
 
-        <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+        <SurfaceCard>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
@@ -508,37 +511,28 @@ export default function Home() {
                 className="bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
                 clearAriaLabel="Clear playlist title"
               />
-              <div className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={newPlaylistIsPublic}
-                  onClick={() => setNewPlaylistIsPublic((prev) => !prev)}
-                  className={`relative inline-flex h-7 w-12 items-center rounded-full border transition ${
-                    newPlaylistIsPublic
-                      ? 'border-transparent bg-[rgb(var(--votuna-accent))]'
-                      : 'border-[color:rgb(var(--votuna-ink)/0.2)] bg-[rgba(var(--votuna-paper),0.8)]'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-[rgb(var(--votuna-paper))] shadow transition ${
-                      newPlaylistIsPublic ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
+              <label className="flex shrink-0 items-center gap-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+                <Switch
+                  checked={newPlaylistIsPublic}
+                  onChange={(checked) => setNewPlaylistIsPublic(checked)}
+                  color="emerald"
+                />
                 <span>{newPlaylistIsPublic ? 'Public' : 'Private'}</span>
-              </div>
-              <Button
+              </label>
+              <AppButton
                 onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || !newPlaylistTitle.trim()}
-                className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
               >
                 {createMutation.isPending ? 'Creating...' : 'Create'}
-              </Button>
+              </AppButton>
             </div>
           </div>
-          {playlistErrorMessage ? <p className="mt-4 text-xs text-rose-500">{playlistErrorMessage}</p> : null}
-        </Card>
+          {playlistErrorMessage ? (
+            <StatusCallout tone="error" title="Playlist action" className="mt-4">
+              {playlistErrorMessage}
+            </StatusCallout>
+          ) : null}
+        </SurfaceCard>
 
         {shouldShowCollaboratorSection ? (
           <div className="grid gap-6">
@@ -546,9 +540,9 @@ export default function Home() {
               <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">Collaborator playlists</h2>
             </div>
             {isCollaboratorSectionLoading ? (
-              <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+              <SurfaceCard>
                 <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading collaborator playlists...</p>
-              </Card>
+              </SurfaceCard>
             ) : (
               <div className="grid gap-4">
                 {collaboratorVotunaPlaylists.map((playlist) => {
@@ -559,9 +553,9 @@ export default function Home() {
                     profilePermalinkUrl: playlist.owner_profile_url,
                   })
                   return (
-                    <Card
+                    <SurfaceCard
                       key={playlist.id}
-                      className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-5 shadow-xl shadow-black/5"
+                      className="p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -590,7 +584,7 @@ export default function Home() {
                           Open
                         </Link>
                       </div>
-                    </Card>
+                    </SurfaceCard>
                   )
                 })}
                 {pendingInvites.map((invite) => {
@@ -598,9 +592,9 @@ export default function Home() {
                   const isAccepting = action === 'accept'
                   const isDeclining = action === 'decline'
                   return (
-                    <Card
+                    <SurfaceCard
                       key={invite.invite_id}
-                      className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-5 shadow-xl shadow-black/5"
+                      className="p-5"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -615,28 +609,31 @@ export default function Home() {
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Button
+                          <AppButton
                             onClick={() => acceptInviteMutation.mutate(invite.invite_id)}
                             disabled={Boolean(action)}
-                            className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
                           >
                             {isAccepting ? 'Accepting...' : 'Accept'}
-                          </Button>
-                          <Button
+                          </AppButton>
+                          <AppButton
+                            intent="secondary"
                             onClick={() => declineInviteMutation.mutate(invite.invite_id)}
                             disabled={Boolean(action)}
-                            className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.16)] bg-transparent text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.95)]"
                           >
                             {isDeclining ? 'Declining...' : 'Decline'}
-                          </Button>
+                          </AppButton>
                         </div>
                       </div>
-                    </Card>
+                    </SurfaceCard>
                   )
                 })}
               </div>
             )}
-            {pendingInvitesErrorMessage ? <p className="text-xs text-rose-500">{pendingInvitesErrorMessage}</p> : null}
+            {pendingInvitesErrorMessage ? (
+              <StatusCallout tone="error" title="Invite action">
+                {pendingInvitesErrorMessage}
+              </StatusCallout>
+            ) : null}
           </div>
         ) : null}
 
@@ -646,13 +643,13 @@ export default function Home() {
           </div>
 
           {providerDashboardLoading ? (
-            <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+            <SurfaceCard>
               <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlists...</p>
-            </Card>
+            </SurfaceCard>
           ) : providerPlaylists.length === 0 ? (
-            <Card className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-6 shadow-xl shadow-black/5">
+            <SurfaceCard>
               <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">No playlists found.</p>
-            </Card>
+            </SurfaceCard>
           ) : (
             <div className="grid gap-4">
               {providerPlaylists.map((playlist) => {
@@ -666,9 +663,9 @@ export default function Home() {
                   providerPlaylistUrl: playlist.url,
                 })
                 return (
-                  <Card
+                  <SurfaceCard
                     key={playlist.provider_playlist_id}
-                    className="rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.9)] p-5 shadow-xl shadow-black/5"
+                    className="p-5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
@@ -708,16 +705,15 @@ export default function Home() {
                           </Link>
                         </div>
                       ) : (
-                        <Button
+                        <AppButton
                           onClick={() => enableMutation.mutate(playlist)}
                           disabled={enabling[playlist.provider_playlist_id]}
-                          className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
                         >
                           {enabling[playlist.provider_playlist_id] ? 'Enabling...' : 'Enable Votuna'}
-                        </Button>
+                        </AppButton>
                       )}
                     </div>
-                  </Card>
+                  </SurfaceCard>
                 )
               })}
             </div>

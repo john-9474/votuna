@@ -1,14 +1,16 @@
 'use client'
 
-import { Button, Dialog, DialogPanel } from '@tremor/react'
+import { Dialog, DialogPanel, TextInput } from '@tremor/react'
 import { useState } from 'react'
 
 import { API_URL } from '@/lib/api'
 import type { usePlaylistInvites } from '@/lib/hooks/playlistDetail/usePlaylistInvites'
 import type { usePlaylistMembers } from '@/lib/hooks/playlistDetail/usePlaylistMembers'
 import type { PlaylistMember } from '@/lib/types/votuna'
+import AppButton from '@/components/ui/AppButton'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import UserAvatar from '@/components/ui/UserAvatar'
 
@@ -53,21 +55,16 @@ export default function CollaboratorsSection({
         </div>
         <div className="flex items-center gap-2">
           {memberActions.canLeavePlaylist ? (
-            <Button
+            <AppButton
+              intent="danger"
               onClick={memberActions.leave.run}
               disabled={memberActions.leave.isPending}
-              className="rounded-full border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {memberActions.leave.isPending ? 'Leaving...' : 'Leave playlist'}
-            </Button>
+            </AppButton>
           ) : null}
           {invites.canInvite ? (
-            <Button
-              onClick={invites.modal.open}
-              className="rounded-full bg-[rgb(var(--votuna-ink))] text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
-            >
-              Invite
-            </Button>
+            <AppButton onClick={invites.modal.open}>Invite</AppButton>
           ) : null}
         </div>
       </div>
@@ -126,14 +123,15 @@ export default function CollaboratorsSection({
                     {member.role}
                   </p>
                   {canRemoveMember ? (
-                    <button
-                      type="button"
+                    <AppButton
+                      intent="danger"
+                      size="xs"
+                      className="mt-2"
                       onClick={() => memberActions.remove.run(member.user_id)}
                       disabled={memberActions.remove.isPending}
-                      className="mt-2 inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isRemovingMember ? 'Removing...' : 'Remove'}
-                    </button>
+                    </AppButton>
                   ) : null}
                 </div>
               </div>
@@ -141,8 +139,16 @@ export default function CollaboratorsSection({
           })}
         </div>
       )}
-      {memberActions.error ? <p className="mt-3 text-xs text-rose-500">{memberActions.error}</p> : null}
-      {memberActions.status ? <p className="mt-3 text-xs text-emerald-600">{memberActions.status}</p> : null}
+      {memberActions.error ? (
+        <StatusCallout tone="error" title="Member action failed" className="mt-3">
+          {memberActions.error}
+        </StatusCallout>
+      ) : null}
+      {memberActions.status ? (
+        <StatusCallout tone="success" title="Member status" className="mt-3">
+          {memberActions.status}
+        </StatusCallout>
+      ) : null}
 
       {invites.canInvite ? (
         invites.isPendingInvitesLoading ? (
@@ -153,10 +159,14 @@ export default function CollaboratorsSection({
               Invited (pending)
             </p>
             {invites.invite.error ? (
-              <p className="mt-2 text-xs text-rose-500">{invites.invite.error}</p>
+              <StatusCallout tone="error" title="Invite failed" className="mt-2">
+                {invites.invite.error}
+              </StatusCallout>
             ) : null}
             {invites.invite.status ? (
-              <p className="mt-2 text-xs text-emerald-600">{invites.invite.status}</p>
+              <StatusCallout tone="success" title="Invite status" className="mt-2">
+                {invites.invite.status}
+              </StatusCallout>
             ) : null}
             <div className="mt-3 space-y-2">
               {invites.pendingUserInvites.map((invite) => {
@@ -204,17 +214,18 @@ export default function CollaboratorsSection({
                       <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
                         Invited
                       </p>
-                      <button
-                        type="button"
+                      <AppButton
+                        intent="icon"
+                        size="xs"
+                        className="h-7 w-7 text-sm"
                         onClick={() => invites.invite.cancelPendingInvite(invite.id)}
                         disabled={invites.invite.isCancelling}
                         aria-label={`Cancel invite for ${displayName}`}
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:rgb(var(--votuna-ink)/0.18)] text-sm font-semibold text-[color:rgb(var(--votuna-ink)/0.75)] transition hover:border-[color:rgb(var(--votuna-ink)/0.35)] hover:text-[rgb(var(--votuna-ink))] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {invites.invite.isCancelling && invites.invite.cancellingInviteId === invite.id
                           ? '...'
-                          : '×'}
-                      </button>
+                          : 'x'}
+                      </AppButton>
                     </div>
                   </div>
                 )
@@ -225,25 +236,20 @@ export default function CollaboratorsSection({
       ) : null}
 
       <Dialog open={invites.modal.isOpen} onClose={invites.modal.close}>
-        <DialogPanel className="w-full max-w-2xl rounded-3xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgb(var(--votuna-paper))] p-6 shadow-2xl shadow-black/10">
+        <DialogPanel className="w-full max-w-2xl p-6">
           <div className="flex items-start justify-between gap-6">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">
                 Invite collaborator
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                Find a user
-              </h2>
+              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">Find a user</h2>
               <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                 Search by name or user ID and select a result to send an invite.
               </p>
             </div>
-            <button
-              onClick={invites.modal.close}
-              className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] px-3 py-1 text-xs text-[color:rgb(var(--votuna-ink)/0.5)] transition hover:border-[color:rgb(var(--votuna-ink)/0.2)] hover:text-[color:rgb(var(--votuna-ink)/0.8)]"
-            >
+            <AppButton intent="ghost" onClick={invites.modal.close}>
               Close
-            </button>
+            </AppButton>
           </div>
 
           <form
@@ -259,24 +265,27 @@ export default function CollaboratorsSection({
               onValueChange={invites.search.setQuery}
               placeholder="Search users"
               containerClassName="flex-1"
-              className="bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
               clearAriaLabel="Clear user search"
             />
-            <Button
-              type="submit"
-              disabled={invites.search.isLoading}
-              className="rounded-full bg-[rgb(var(--votuna-ink))] px-5 text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
-            >
+            <AppButton type="submit" disabled={invites.search.isLoading}>
               {invites.search.isLoading ? 'Searching...' : 'Search'}
-            </Button>
+            </AppButton>
           </form>
 
           {invites.search.error ? (
-            <p className="mt-3 text-xs text-rose-500">{invites.search.error}</p>
+            <StatusCallout tone="error" title="Search failed" className="mt-3">
+              {invites.search.error}
+            </StatusCallout>
           ) : null}
-          {invites.invite.error ? <p className="mt-3 text-xs text-rose-500">{invites.invite.error}</p> : null}
+          {invites.invite.error ? (
+            <StatusCallout tone="error" title="Invite failed" className="mt-3">
+              {invites.invite.error}
+            </StatusCallout>
+          ) : null}
           {invites.invite.status ? (
-            <p className="mt-3 text-xs text-emerald-600">{invites.invite.status}</p>
+            <StatusCallout tone="success" title="Invite status" className="mt-3">
+              {invites.invite.status}
+            </StatusCallout>
           ) : null}
 
           {invites.search.results.length > 0 ? (
@@ -317,20 +326,19 @@ export default function CollaboratorsSection({
                         View profile
                       </a>
                     ) : null}
-                    <Button
+                    <AppButton
                       onClick={() => invites.invite.sendToCandidate(candidate)}
                       disabled={invites.invite.isSending}
-                      className="rounded-full bg-[rgb(var(--votuna-ink))] px-4 text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
                     >
                       {invites.invite.isSending ? 'Inviting...' : 'Invite'}
-                    </Button>
+                    </AppButton>
                   </div>
                 </div>
               ))}
             </div>
           ) : null}
 
-          <div className="mt-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.85)] p-4">
+          <div className="mt-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] p-4">
             <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">Or share an invite link.</p>
             {invites.search.hasSearched && invites.search.results.length === 0 ? (
               <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.62)]">
@@ -338,33 +346,28 @@ export default function CollaboratorsSection({
               </p>
             ) : null}
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <Button
-                onClick={invites.link.create}
-                disabled={invites.link.isCreating}
-                className="rounded-full bg-[rgb(var(--votuna-ink))] px-4 text-[rgb(var(--votuna-paper))] hover:bg-[color:rgb(var(--votuna-ink)/0.9)]"
-              >
+              <AppButton onClick={invites.link.create} disabled={invites.link.isCreating}>
                 {invites.link.isCreating ? 'Generating...' : 'Generate invite link'}
-              </Button>
+              </AppButton>
             </div>
-            {invites.link.error ? <p className="mt-3 text-xs text-rose-500">{invites.link.error}</p> : null}
+            {invites.link.error ? (
+              <StatusCallout tone="error" title="Invite link" className="mt-3">
+                {invites.link.error}
+              </StatusCallout>
+            ) : null}
             {invites.link.url ? (
               <div className="mt-3">
                 <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">Invite link</p>
                 <div className="mt-2 flex items-center gap-2">
-                  <input
-                    value={invites.link.url}
-                    readOnly
-                    className="w-full rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)] bg-[rgba(var(--votuna-paper),0.9)] px-3 py-2 text-xs text-[rgb(var(--votuna-ink))]"
-                  />
-                  <Button
-                    onClick={() => copyInviteLink(invites.link.url)}
-                    className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.16)] bg-transparent px-4 text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.9)]"
-                  >
+                  <TextInput value={invites.link.url} readOnly />
+                  <AppButton intent="secondary" onClick={() => copyInviteLink(invites.link.url)}>
                     Copy
-                  </Button>
+                  </AppButton>
                 </div>
                 {copyStatus ? (
-                  <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">{copyStatus}</p>
+                  <StatusCallout tone="info" title="Copy status" className="mt-2">
+                    {copyStatus}
+                  </StatusCallout>
                 ) : null}
               </div>
             ) : null}

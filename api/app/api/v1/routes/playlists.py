@@ -29,6 +29,12 @@ def _get_provider_client(provider: str, user: User, db: Session) -> MusicProvide
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+def _raise_provider_api_error(exc: ProviderAPIError) -> None:
+    if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+
 def _to_provider_playlist_out(playlist) -> ProviderPlaylistOut:
     return ProviderPlaylistOut(
         provider=playlist.provider,
@@ -55,7 +61,8 @@ async def list_provider_playlists(
     except ProviderAuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        _raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     return [_to_provider_playlist_out(playlist) for playlist in playlists]
 
 
@@ -74,7 +81,8 @@ async def search_provider_playlists(
     except ProviderAuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        _raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     return [_to_provider_playlist_out(playlist) for playlist in playlists]
 
 
@@ -115,5 +123,6 @@ async def create_provider_playlist(
     except ProviderAuthError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
     except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        _raise_provider_api_error(exc)
+        raise AssertionError("unreachable")
     return _to_provider_playlist_out(playlist)

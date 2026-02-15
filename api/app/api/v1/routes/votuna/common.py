@@ -8,7 +8,7 @@ from app.models.votuna_playlist import VotunaPlaylist
 from app.crud.user import user_crud
 from app.crud.votuna_playlist import votuna_playlist_crud
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
-from app.services.music_providers import MusicProviderClient, get_provider_client_for_user
+from app.services.music_providers import MusicProviderClient, ProviderAPIError, get_provider_client_for_user
 
 
 def get_playlist_or_404(db: Session, playlist_id: int) -> VotunaPlaylist:
@@ -89,3 +89,9 @@ def raise_provider_auth(
         status_code=status.HTTP_409_CONFLICT,
         detail=f"Playlist owner must reconnect {provider_name}",
     )
+
+
+def raise_provider_api_error(exc: ProviderAPIError) -> None:
+    if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
