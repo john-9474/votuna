@@ -93,6 +93,10 @@ def run_migrations_online() -> None:
         logger.info("Alembic connected to database")
         connection.execute(sa.text(f"SET lock_timeout TO '{lock_timeout_ms}ms'"))
         connection.execute(sa.text(f"SET statement_timeout TO '{statement_timeout_ms}ms'"))
+        # SQLAlchemy 2 starts an implicit transaction on execute().
+        # Commit these session settings so Alembic can manage its own migration
+        # transaction and persist DDL changes.
+        connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
