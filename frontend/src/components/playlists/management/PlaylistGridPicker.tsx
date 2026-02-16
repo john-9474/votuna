@@ -1,3 +1,5 @@
+import { Grid, Text } from '@tremor/react'
+
 type PlaylistGridOption = {
   key: string
   label: string
@@ -20,14 +22,14 @@ export default function PlaylistGridPicker({
 }: PlaylistGridPickerProps) {
   if (options.length === 0) {
     return (
-      <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+      <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
         {emptyMessage || 'No eligible playlists found yet. Create or sync another playlist first.'}
-      </p>
+      </Text>
     )
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <Grid className="gap-3" numItems={1} numItemsSm={2} numItemsLg={3}>
       {options.map((option) => {
         const isSelected = selectedKey === option.key
         const initial = option.label.trim().charAt(0).toUpperCase() || '?'
@@ -64,13 +66,13 @@ export default function PlaylistGridPicker({
               </span>
             </div>
             <div className="p-3">
-              <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
+              <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
                 {option.label}
-              </p>
+              </Text>
             </div>
           </button>
         )
       })}
-    </div>
+    </Grid>
   )
 }

@@ -1,8 +1,10 @@
 import { RiAddLine, RiCloseLine, RiThumbDownLine, RiThumbUpLine } from '@remixicon/react'
+import { Text } from '@tremor/react'
 
 import type { Suggestion, TrackPlayRequest } from '@/lib/types/votuna'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import AppButton from '@/components/ui/AppButton'
-import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
@@ -45,26 +47,19 @@ export default function SuggestionsSection({
 }: SuggestionsSectionProps) {
   return (
     <SurfaceCard>
-      <div className="flex items-center justify-between">
-        <div>
-          <SectionEyebrow>Active suggestions</SectionEyebrow>
-          <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-            React with thumbs up or down to resolve each track.
-          </p>
-        </div>
-      </div>
+      <AppSectionHeader
+        eyebrow="Active suggestions"
+        description="React with thumbs up or down to resolve each track."
+      />
 
       {isLoading ? (
-        <p className="mt-4 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading suggestions...</p>
+        <Text className="mt-4 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading suggestions...</Text>
       ) : suggestions.length === 0 ? (
-        <p className="mt-4 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">No active suggestions yet.</p>
+        <Text className="mt-4 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">No active suggestions yet.</Text>
       ) : (
         <div className="mt-4 space-y-3">
           {suggestions.map((suggestion) => (
-            <div
-              key={suggestion.id}
-              className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.8)] px-4 py-3"
-            >
+            <AppPanelRow key={suggestion.id}>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <TrackArtwork
@@ -82,9 +77,9 @@ export default function SuggestionsSection({
                         {suggestion.track_title || 'Untitled track'}
                       </a>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
+                      <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
                         {suggestion.track_title || 'Untitled track'}
-                      </p>
+                      </Text>
                     )}
                     <div className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                       {suggestion.track_artist || 'Unknown artist'} -{' '}
@@ -101,16 +96,16 @@ export default function SuggestionsSection({
                 </div>
                 <div className="flex w-full items-center justify-between gap-3 text-right sm:w-auto sm:justify-end">
                   <div className="min-w-0">
-                    <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+                    <Text className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
                       {suggestion.suggested_by_user_id
                         ? memberNameById.get(suggestion.suggested_by_user_id)
                           ? `Suggested by ${memberNameById.get(suggestion.suggested_by_user_id)}`
                           : 'Suggested by a former member'
                         : 'Suggested outside Votuna'}
-                    </p>
-                    <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.5)] tabular-nums">
+                    </Text>
+                    <Text className="text-xs text-[color:rgb(var(--votuna-ink)/0.5)] tabular-nums">
                       {formatAddedDate(suggestion.created_at)}
-                    </p>
+                    </Text>
                   </div>
                   <div className="flex items-center gap-2">
                     {suggestion.track_url ? (
@@ -178,7 +173,7 @@ export default function SuggestionsSection({
                   </div>
                 </div>
               </div>
-            </div>
+            </AppPanelRow>
           ))}
         </div>
       )}

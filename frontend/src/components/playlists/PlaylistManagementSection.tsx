@@ -1,5 +1,5 @@
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
-import SectionEyebrow from '@/components/ui/SectionEyebrow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import MergingBulkEditingSection from '@/components/playlists/management/MergingBulkEditingSection'
 import UtilityStubSection from '@/components/playlists/management/UtilityStubSection'
@@ -13,10 +13,11 @@ export default function PlaylistManagementSection({ management }: PlaylistManage
     return (
       <div className="space-y-6">
         <SurfaceCard>
-          <SectionEyebrow>Manage</SectionEyebrow>
-          <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
-            Only the playlist owner can copy songs between playlists.
-          </p>
+          <AppSectionHeader
+            eyebrow="Manage"
+            description="Only the playlist owner can copy songs between playlists."
+            className="gap-0"
+          />
         </SurfaceCard>
         {management.utilitySections.map((section) => (
           <UtilityStubSection
@@ -42,4 +43,3 @@ export default function PlaylistManagementSection({ management }: PlaylistManage
     </div>
   )
 }
-

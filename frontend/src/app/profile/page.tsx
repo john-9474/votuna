@@ -1,14 +1,15 @@
 'use client'
 
-import { Select, SelectItem, Switch } from '@tremor/react'
+import { Col, Grid, Select, SelectItem, Switch, Text } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import Link from 'next/link'
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 
 import EditableProfileField from '@/components/profile/EditableProfileField'
 import { queryKeys } from '@/lib/constants/queryKeys'
+import AppButton from '@/components/ui/AppButton'
 import PageShell from '@/components/ui/PageShell'
-import PrimaryButton from '@/components/ui/PrimaryButton'
+import AppRouteButton from '@/components/ui/AppRouteButton'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
@@ -216,7 +217,7 @@ export default function ProfilePage() {
     return (
       <PageShell maxWidth="4xl">
         <SurfaceCard>
-          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading profile...</p>
+          <Text>Loading profile...</Text>
         </SurfaceCard>
       </PageShell>
     )
@@ -227,15 +228,12 @@ export default function ProfilePage() {
       <PageShell maxWidth="4xl">
         <SurfaceCard>
           <h1 className="text-2xl font-semibold text-[rgb(var(--votuna-ink))]">You are not signed in</h1>
-          <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+          <Text className="mt-2">
             Head back to the homepage and connect with a provider to see your profile.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex items-center rounded-full bg-[rgb(var(--votuna-ink))] px-4 py-2 text-sm font-semibold text-[rgb(var(--votuna-paper))]"
-          >
+          </Text>
+          <AppRouteButton href="/" intent="solid" className="mt-6 text-sm">
             Back to home
-          </Link>
+          </AppRouteButton>
         </SurfaceCard>
       </PageShell>
     )
@@ -244,10 +242,7 @@ export default function ProfilePage() {
   return (
     <PageShell maxWidth="4xl">
       <div className="fade-up space-y-6">
-        <div>
-          <SectionEyebrow>Profile</SectionEyebrow>
-          <h1 className="mt-2 text-3xl font-semibold text-[rgb(var(--votuna-ink))]">Welcome back</h1>
-        </div>
+        <AppSectionHeader eyebrow="Profile" title="Welcome back" />
         <SurfaceCard>
           <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-4">
@@ -264,7 +259,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="min-w-[220px] flex-1">
-                <SectionEyebrow className="tracking-[0.2em]">Avatar</SectionEyebrow>
+                <SectionEyebrow compact>Avatar</SectionEyebrow>
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <input
                     ref={fileInputRef}
@@ -273,22 +268,23 @@ export default function ProfilePage() {
                     onChange={onAvatarChange}
                     className="hidden"
                   />
-                  <PrimaryButton
+                  <AppButton
+                    intent="primary"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={avatarUploading}
                   >
                     {avatarUploading ? 'Uploading...' : 'Upload avatar'}
-                  </PrimaryButton>
+                  </AppButton>
                 </div>
                 {avatarStatus ? (
-                  <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                  <Text className="mt-2 text-xs">
                     {avatarStatus}
-                  </p>
+                  </Text>
                 ) : null}
               </div>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2">
+            <Grid className="gap-6" numItems={1} numItemsSm={2}>
               <EditableProfileField
                 label="Display name"
                 value={form.display_name}
@@ -300,10 +296,10 @@ export default function ProfilePage() {
               />
 
               <div>
-                <SectionEyebrow className="tracking-[0.2em]">Provider</SectionEyebrow>
-                <p className="mt-3 text-base font-semibold text-[rgb(var(--votuna-ink))]">
+                <SectionEyebrow compact>Provider</SectionEyebrow>
+                <Text className="mt-3 text-base font-semibold text-[rgb(var(--votuna-ink))]">
                   {user.auth_provider ?? '-'}
-                </p>
+                </Text>
               </div>
 
               <EditableProfileField
@@ -326,44 +322,43 @@ export default function ProfilePage() {
                 status={status.last_name}
               />
 
-              <EditableProfileField
-                label="Email"
-                value={form.email}
-                onChange={(value) => updateField('email', value)}
-                isDirty={isDirty('email')}
-                onSave={() => saveField('email')}
-                isSaving={saving.email}
-                status={status.email}
-                className="sm:col-span-2"
-                rowClassName="flex-wrap"
-                inputClassName="min-w-[220px] flex-1"
-              />
-            </div>
+              <Col numColSpanSm={2}>
+                <EditableProfileField
+                  label="Email"
+                  value={form.email}
+                  onChange={(value) => updateField('email', value)}
+                  isDirty={isDirty('email')}
+                  onSave={() => saveField('email')}
+                  isSaving={saving.email}
+                  status={status.email}
+                  rowClassName="flex-wrap"
+                  inputClassName="min-w-[220px] flex-1"
+                />
+              </Col>
+            </Grid>
           </div>
         </SurfaceCard>
 
         <SurfaceCard>
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <SectionEyebrow>Settings</SectionEyebrow>
-              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                Personal preferences
-              </h2>
-              <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                Control the way Votuna looks and whether we send you emails.
-              </p>
-            </div>
-            <PrimaryButton
-              onClick={saveSettings}
-              disabled={!settingsDirty || settingsMutation.isPending || settingsQuery.isLoading}
-            >
-              {settingsMutation.isPending ? 'Saving...' : 'Save settings'}
-            </PrimaryButton>
-          </div>
+          <AppSectionHeader
+            eyebrow="Settings"
+            title="Personal preferences"
+            description="Control the way Votuna looks and whether we send you emails."
+            actions={
+              <AppButton
+                intent="primary"
+                onClick={saveSettings}
+                disabled={!settingsDirty || settingsMutation.isPending || settingsQuery.isLoading}
+              >
+                {settingsMutation.isPending ? 'Saving...' : 'Save settings'}
+              </AppButton>
+            }
+            className="items-start"
+          />
 
-          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <Grid className="mt-6 gap-6" numItems={1} numItemsSm={2}>
             <div>
-              <SectionEyebrow className="tracking-[0.2em]">Theme</SectionEyebrow>
+              <SectionEyebrow compact>Theme</SectionEyebrow>
               <div className="mt-2">
                 <Select
                   value={settingsForm.theme}
@@ -375,12 +370,12 @@ export default function ProfilePage() {
                   <SelectItem value="dark">Dark</SelectItem>
                 </Select>
               </div>
-              <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+              <Text className="mt-2 text-xs">
                 Match your OS preference or force a theme.
-              </p>
+              </Text>
             </div>
             <div>
-              <SectionEyebrow className="tracking-[0.2em]">Emails</SectionEyebrow>
+              <SectionEyebrow compact>Emails</SectionEyebrow>
               <label className="mt-3 flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                 <Switch
                   checked={settingsForm.receive_emails}
@@ -389,14 +384,16 @@ export default function ProfilePage() {
                 Receive product updates and notifications.
               </label>
             </div>
-          </div>
+          </Grid>
           {settingsStatus ? (
             <StatusCallout tone="info" title="Settings status" className="mt-4">
               {settingsStatus}
             </StatusCallout>
           ) : null}
           {settingsQuery.isLoading ? (
-            <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">Loading settings...</p>
+            <Text className="mt-2 text-xs">
+              Loading settings...
+            </Text>
           ) : null}
         </SurfaceCard>
       </div>

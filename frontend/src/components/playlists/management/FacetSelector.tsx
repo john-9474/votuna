@@ -1,7 +1,8 @@
-import { Badge } from '@tremor/react'
+import { Badge, Text } from '@tremor/react'
 
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import AppButton from '@/components/ui/AppButton'
+import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import { hasValue } from '@/lib/hooks/playlistDetail/management/shared'
 
@@ -34,7 +35,9 @@ export default function FacetSelector({
 }: FacetSelectorProps) {
   return (
     <div className="space-y-3">
-      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">{label}</p>
+      <SectionEyebrow compact tone="strong">
+        {label}
+      </SectionEyebrow>
 
       <div className="flex gap-2">
         <ClearableTextInput
@@ -88,7 +91,9 @@ export default function FacetSelector({
         </StatusCallout>
       ) : suggestions.length > 0 ? (
         <div>
-          <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">Suggested from source playlist</p>
+          <Text className="text-xs">
+            Suggested from source playlist
+          </Text>
           <div className="mt-2 flex flex-wrap gap-2">
             {suggestions.map((item) => {
               const selected = hasValue(selectedValues, item.value)

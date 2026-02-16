@@ -1,8 +1,9 @@
-import { Dialog, DialogPanel, NumberInput, Switch } from '@tremor/react'
+import { Dialog, DialogPanel, NumberInput, Subtitle, Switch, Text } from '@tremor/react'
 import { useState } from 'react'
 
 import AppButton from '@/components/ui/AppButton'
-import PrimaryButton from '@/components/ui/PrimaryButton'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
@@ -43,29 +44,26 @@ export default function PlaylistSettingsSection({
 
   return (
     <SurfaceCard>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <SectionEyebrow>Settings</SectionEyebrow>
-          <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-            Configure playlist type and song addition behavior.
-          </p>
-        </div>
-        <PrimaryButton onClick={onSaveSettings} disabled={isSaving || !canEditVoting}>
-          {isSaving ? 'Saving...' : 'Save settings'}
-        </PrimaryButton>
-      </div>
+      <AppSectionHeader
+        eyebrow="Settings"
+        description="Configure playlist type and song addition behavior."
+        actions={
+          <AppButton intent="primary" onClick={onSaveSettings} disabled={isSaving || !canEditVoting}>
+            {isSaving ? 'Saving...' : 'Save settings'}
+          </AppButton>
+        }
+        className="items-center"
+      />
       <div className="mt-6 space-y-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-            Playlist type
-          </p>
-          <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+          <SectionEyebrow compact>Playlist type</SectionEyebrow>
+          <Text className="mt-2 text-xs">
             Current: <span className="font-medium">{isCollaborative ? 'Collaborative' : 'Personal'}</span>
             {isCollaborative ? ` (${collaboratorCount} collaborator${collaboratorCount === 1 ? '' : 's'})` : ''}
-          </p>
-          <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+          </Text>
+          <Text className="mt-1 text-xs">
             Collaborative mode turns on automatically when someone joins.
-          </p>
+          </Text>
           {isCollaborative ? (
             <div className="mt-3">
               <StatusCallout tone="warning" title="One-way action">
@@ -93,11 +91,9 @@ export default function PlaylistSettingsSection({
           Voting settings are only used for collaborative playlists.
         </StatusCallout>
 
-        <div className="space-y-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)] p-4">
+        <AppPanelRow className="space-y-4 p-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-              Tie-break mode
-            </p>
+            <SectionEyebrow compact>Tie-break mode</SectionEyebrow>
             <div className="mt-3 flex items-center gap-3">
               <span className="text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">Reject on tie</span>
               <Switch
@@ -107,15 +103,13 @@ export default function PlaylistSettingsSection({
               />
               <span className="text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">Add on tie</span>
             </div>
-            <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
+            <Text className="mt-2 text-xs">
               Current mode: <span className="font-medium">{isAddOnTie ? 'Add on tie' : 'Reject on tie'}</span>
-            </p>
+            </Text>
           </div>
 
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-              Required vote percent
-            </p>
+            <SectionEyebrow compact>Required vote percent</SectionEyebrow>
             <NumberInput
               min={1}
               max={100}
@@ -129,7 +123,7 @@ export default function PlaylistSettingsSection({
               }}
             />
           </div>
-        </div>
+        </AppPanelRow>
       </div>
 
       {settingsStatus ? (
@@ -150,17 +144,19 @@ export default function PlaylistSettingsSection({
         }}
       >
         <DialogPanel className="w-full max-w-lg p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Are you sure?</p>
+          <Text className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">Are you sure?</Text>
           <h3 className="mt-2 text-xl font-semibold text-[rgb(var(--votuna-ink))]">Switch to personal playlist</h3>
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">This action will:</p>
+          <Subtitle className="mt-3">
+            This action will:
+          </Subtitle>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
             <li>Remove all collaborators</li>
             <li>Revoke outstanding invites</li>
             <li>Delete all pending suggestions</li>
           </ul>
-          <p className="mt-3 text-sm text-amber-700">
+          <Text className="mt-3 text-sm text-amber-700">
             Collaborative mode turns back on automatically when someone joins again.
-          </p>
+          </Text>
           <div className="mt-5 flex items-center justify-end gap-2">
             <AppButton
               intent="ghost"

@@ -1,7 +1,9 @@
-import { Card, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from '@tremor/react'
+import { Card, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, Text } from '@tremor/react'
 import { useEffect, useMemo, useState } from 'react'
 
 import AppButton from '@/components/ui/AppButton'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import StatusCallout from '@/components/ui/StatusCallout'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
 
@@ -48,12 +50,15 @@ export default function ReviewRunPanel({
 
   return (
     <Card className="p-5">
-      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
-        Review and copy
-      </p>
-      <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-        {sourceLabel} {'->'} {destinationLabel}
-      </p>
+      <AppSectionHeader
+        eyebrow="Review and copy"
+        description={
+          <>
+            {sourceLabel} {'->'} {destinationLabel}
+          </>
+        }
+        className="gap-0"
+      />
 
       <div className="mt-4">
         <AppButton
@@ -91,15 +96,15 @@ export default function ReviewRunPanel({
       ) : null}
 
       {review.data ? (
-        <Card className="mt-4 p-4">
+        <AppPanelRow className="mt-4 p-4">
           <div className="grid gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.65)] sm:grid-cols-3">
-            <p>Songs found: {review.data.matched_count}</p>
-            <p>Songs to copy: {review.data.to_add_count}</p>
-            <p>Already in destination: {review.data.duplicate_count}</p>
+            <Text>Songs found: {review.data.matched_count}</Text>
+            <Text>Songs to copy: {review.data.to_add_count}</Text>
+            <Text>Already in destination: {review.data.duplicate_count}</Text>
           </div>
-          <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.56)]">
+          <Text className="mt-2 text-xs">
             Max songs per action: {review.data.max_tracks_per_action}
-          </p>
+          </Text>
           {review.data.matched_sample.length > 0 ? (
             <div className="mt-3">
               <div className="rounded-xl border border-[color:rgb(var(--votuna-ink)/0.08)]">
@@ -143,10 +148,10 @@ export default function ReviewRunPanel({
                   </TableBody>
                 </Table>
               </div>
-              <div className="flex items-center justify-between pt-3 text-[11px] text-[color:rgb(var(--votuna-ink)/0.58)]">
-                <p>
+              <div className="flex items-center justify-between pt-3">
+                <Text className="text-[11px]">
                   Showing {pageRangeStart}-{pageRangeEnd} of {matchedTracks.length}
-                </p>
+                </Text>
                 <div className="flex gap-2">
                   <AppButton
                     intent="ghost"
@@ -168,7 +173,7 @@ export default function ReviewRunPanel({
               </div>
             </div>
           ) : null}
-        </Card>
+        </AppPanelRow>
       ) : null}
 
       {review.runError ? (
@@ -178,13 +183,13 @@ export default function ReviewRunPanel({
       ) : null}
 
       {review.runResult ? (
-        <Card className="mt-4 p-4">
-          <p className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Copy result</p>
+        <AppPanelRow className="mt-4 p-4">
+          <Text className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Copy result</Text>
           <div className="mt-2 grid gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.65)] sm:grid-cols-2">
-            <p>Songs found: {review.runResult.matched_count}</p>
-            <p>Copied: {review.runResult.added_count}</p>
-            <p>Already in destination: {review.runResult.skipped_duplicate_count}</p>
-            <p>Could not copy: {review.runResult.failed_count}</p>
+            <Text>Songs found: {review.runResult.matched_count}</Text>
+            <Text>Copied: {review.runResult.added_count}</Text>
+            <Text>Already in destination: {review.runResult.skipped_duplicate_count}</Text>
+            <Text>Could not copy: {review.runResult.failed_count}</Text>
           </div>
           {review.runResult.failed_items.length > 0 ? (
             <div className="mt-3">
@@ -200,7 +205,7 @@ export default function ReviewRunPanel({
               </ul>
             </div>
           ) : null}
-        </Card>
+        </AppPanelRow>
       ) : null}
     </Card>
   )

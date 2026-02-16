@@ -1,4 +1,7 @@
+import { Text } from '@tremor/react'
+
 import AppButton from '@/components/ui/AppButton'
+import AppLinkButton from '@/components/ui/AppLinkButton'
 import type { PlayerTrack } from '@/lib/types/votuna'
 
 import TrackArtwork from './TrackArtwork'
@@ -31,24 +34,24 @@ export default function NowPlayingDock({ track, onClose }: NowPlayingDockProps) 
           <div className="flex min-w-0 items-center gap-3">
             <TrackArtwork artworkUrl={track.artwork_url} title={track.title} />
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+              <Text className="text-[10px] uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
                 Now Playing
-              </p>
-              <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
-              <p className="truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+              </Text>
+              <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
+              <Text className="truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                 {track.artist || 'Unknown artist'}
-              </p>
+              </Text>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a
+            <AppLinkButton
               href={track.url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex w-24 justify-center rounded-full border border-[color:rgb(var(--votuna-ink)/0.18)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.7)]"
+              className="w-24"
             >
               Open
-            </a>
+            </AppLinkButton>
             <AppButton onClick={onClose} className="w-24 justify-center">
               Close
             </AppButton>

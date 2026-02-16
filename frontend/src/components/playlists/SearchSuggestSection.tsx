@@ -1,10 +1,12 @@
 import { RiPlayFill, RiThumbDownLine, RiThumbUpLine } from '@remixicon/react'
+import { Text } from '@tremor/react'
 import Image from 'next/image'
 
 import type { ProviderTrack, TrackPlayRequest } from '@/lib/types/votuna'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import AppButton from '@/components/ui/AppButton'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
-import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
@@ -90,14 +92,14 @@ export default function SearchSuggestSection({
 
   return (
     <SurfaceCard>
-      <div>
-        <SectionEyebrow>{isCollaborative ? 'Find and suggest tracks' : 'Find and add tracks'}</SectionEyebrow>
-        <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-          {isCollaborative
+      <AppSectionHeader
+        eyebrow={isCollaborative ? 'Find and suggest tracks' : 'Find and add tracks'}
+        description={
+          isCollaborative
             ? `Search ${providerLabel} tracks, play the track, and suggest it to the vote queue.`
-            : `Search ${providerLabel} tracks, play the track, and add it directly to your playlist.`}
-        </p>
-      </div>
+            : `Search ${providerLabel} tracks, play the track, and add it directly to your playlist.`
+        }
+      />
 
       <form
         className="mt-6 flex flex-wrap items-center gap-3"
@@ -128,10 +130,7 @@ export default function SearchSuggestSection({
       {searchResults.length > 0 ? (
         <div className="mt-4 space-y-3">
           {searchResults.map((track) => (
-            <div
-              key={track.provider_track_id}
-              className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.8)] p-4"
-            >
+            <AppPanelRow key={track.provider_track_id} className="p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <TrackArtwork artworkUrl={track.artwork_url} title={track.title} />
@@ -146,11 +145,11 @@ export default function SearchSuggestSection({
                         {track.title}
                       </a>
                     ) : (
-                      <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
+                      <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
                     )}
-                    <p className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                    <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                       {track.artist || 'Unknown artist'}
-                    </p>
+                    </Text>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -190,15 +189,17 @@ export default function SearchSuggestSection({
                   )}
                 </div>
               </div>
-            </div>
+            </AppPanelRow>
           ))}
         </div>
       ) : null}
 
       <div className="mt-6 border-t border-[color:rgb(var(--votuna-ink)/0.08)] pt-5">
-        <p className="text-xs uppercase tracking-[0.22em] text-[color:rgb(var(--votuna-ink)/0.45)]">
-          {isCollaborative ? 'Suggest directly from link' : 'Add directly from link'}
-        </p>
+        <AppSectionHeader
+          eyebrow={isCollaborative ? 'Suggest directly from link' : 'Add directly from link'}
+          className="gap-0"
+          descriptionClassName="mt-0"
+        />
         <form
           className="mt-3 flex flex-wrap items-center gap-3"
           onSubmit={(event) => {
@@ -226,11 +227,9 @@ export default function SearchSuggestSection({
       ) : null}
 
       <div className="mt-6 border-t border-[color:rgb(var(--votuna-ink)/0.08)] pt-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs uppercase tracking-[0.22em] text-[color:rgb(var(--votuna-ink)/0.45)]">
-            Suggested for this playlist
-          </p>
-          <div className="flex items-center gap-2">
+        <AppSectionHeader
+          eyebrow="Suggested for this playlist"
+          actions={
             <AppButton
               intent="secondary"
               onClick={onRefreshRecommendations}
@@ -238,17 +237,19 @@ export default function SearchSuggestSection({
             >
               Refresh
             </AppButton>
-          </div>
-        </div>
+          }
+          className="items-center"
+          descriptionClassName="mt-0"
+        />
 
         {inPlaylistTrackIds.length === 0 ? (
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
+          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
             Add tracks to this playlist to generate recommendations.
-          </p>
+          </Text>
         ) : isRecommendationsLoading && recommendedTracks.length === 0 ? (
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">Loading recommendations...</p>
+          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">Loading recommendations...</Text>
         ) : recommendedTracks.length === 0 ? (
-          <p className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">No more recommendations right now.</p>
+          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">No more recommendations right now.</Text>
         ) : (
           <div className="mt-4 -mx-1 snap-x snap-mandatory overflow-x-auto pb-2 scroll-smooth">
             <div className="mx-auto flex w-fit min-w-max gap-4 px-1">
@@ -314,11 +315,11 @@ export default function SearchSuggestSection({
                           {track.title}
                         </a>
                       ) : (
-                        <p className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</p>
+                        <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
                       )}
-                      <p className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                      <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                         {track.artist || 'Unknown artist'}
-                      </p>
+                      </Text>
                     </div>
                     <div className="mt-3 flex items-center justify-center gap-2">
                       <AppButton
@@ -345,9 +346,9 @@ export default function SearchSuggestSection({
                       </AppButton>
                     </div>
                     {inPlaylist ? (
-                      <p className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">In playlist</p>
+                      <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">In playlist</Text>
                     ) : suggested ? (
-                      <p className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">Suggested</p>
+                      <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">Suggested</Text>
                     ) : null}
                   </div>
                 )

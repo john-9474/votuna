@@ -1,15 +1,18 @@
 'use client'
 
-import { Switch } from '@tremor/react'
+import { Col, Grid, Switch, Text } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { getProviderPlaylistUrl } from '@/lib/providerLinks'
 import type { PendingInvite, VotunaPlaylist } from '@/lib/types/votuna'
 import AppButton from '@/components/ui/AppButton'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppRouteButton from '@/components/ui/AppRouteButton'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
+import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import { apiFetch, apiJson, ApiError } from '../lib/api'
@@ -131,132 +134,103 @@ function Landing() {
 
   return (
     <main className="relative overflow-hidden">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 pt-6 lg:flex-row lg:items-start">
-        <div className="fade-up space-y-6 lg:w-3/5">
-          <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2 text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.55)] shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
-            Alpha
-          </div>
-          <h1 className="text-5xl font-semibold tracking-tight text-[rgb(var(--votuna-ink))] sm:text-6xl">
-            Open source playlist voting for Spotify and SoundCloud.
-          </h1>
-          <p className="text-lg text-[color:rgb(var(--votuna-ink)/0.7)] sm:text-xl">
-            Votuna helps groups suggest tracks, vote together, and manage what gets added next.
-          </p>
-          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-            Use <span className="font-semibold">Log in</span> in the top-right to connect
-            your provider and start.
-          </p>
-          <div className="flex flex-wrap gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.55)]">
-            <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              FastAPI backend
-            </span>
-            <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              Next.js frontend
-            </span>
-            <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-              Spotify and SoundCloud support
-            </span>
-          </div>
-        </div>
-
-        <div className="fade-up-delay lg:w-2/5">
-          <SurfaceCard>
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-                  Summary
-                </p>
-                <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                  Current features
-                </h2>
-              </div>
-              <ul className="space-y-2 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]">
-                {statusItems.map((item) => (
-                  <li key={item} className="flex items-start gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
+      <div className="mx-auto w-full max-w-6xl px-6 pt-6">
+        <Grid className="gap-10" numItems={1} numItemsLg={5}>
+          <Col numColSpanLg={3} className="fade-up space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2 text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.55)] shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
+              Alpha
             </div>
-          </SurfaceCard>
-        </div>
+            <h1 className="text-5xl font-semibold tracking-tight text-[rgb(var(--votuna-ink))] sm:text-6xl">
+              Open source playlist voting for Spotify and SoundCloud.
+            </h1>
+            <Text className="text-lg text-[color:rgb(var(--votuna-ink)/0.7)] sm:text-xl">
+              Votuna helps groups suggest tracks, vote together, and manage what gets added next.
+            </Text>
+            <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+              Use <span className="font-semibold">Log in</span> in the top-right to connect your
+              provider and start.
+            </Text>
+            <div className="flex flex-wrap gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.55)]">
+              <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
+                FastAPI backend
+              </span>
+              <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
+                Next.js frontend
+              </span>
+              <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
+                Spotify and SoundCloud support
+              </span>
+            </div>
+          </Col>
+
+          <Col numColSpanLg={2} className="fade-up-delay">
+            <SurfaceCard>
+              <div className="space-y-6">
+                <AppSectionHeader eyebrow="Summary" title="Current features" />
+                <ul className="space-y-2 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]">
+                  {statusItems.map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <span className="mt-1 h-2 w-2 rounded-full bg-[rgb(var(--votuna-accent))]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </SurfaceCard>
+          </Col>
+        </Grid>
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-6 pb-16 pt-8">
         <SurfaceCard className="fade-up-delay">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-                Overview
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                Current features
-              </h2>
-            </div>
-            <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
-              Based on functionality that is available today.
-            </p>
-          </div>
+          <AppSectionHeader
+            eyebrow="Overview"
+            title="Current features"
+            description="Based on functionality that is available today."
+          />
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <Grid className="mt-6 gap-4" numItems={1} numItemsMd={2} numItemsLg={3}>
             {featureCards.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] p-4"
-              >
-                <p className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{feature.title}</p>
-                <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
+              <AppPanelRow key={feature.title} className="p-4">
+                <Text className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{feature.title}</Text>
+                <Text className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
                   {feature.description}
-                </p>
-                <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">{feature.detail}</p>
-              </div>
+                </Text>
+                <Text className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">{feature.detail}</Text>
+              </AppPanelRow>
             ))}
-          </div>
+          </Grid>
         </SurfaceCard>
 
         <SurfaceCard className="fade-up-delay-lg mt-6">
-          <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-            How it works
-          </p>
-          <ol className="mt-4 grid gap-3 md:grid-cols-2">
+          <AppSectionHeader eyebrow="How it works" />
+          <Grid className="mt-4 gap-3" numItems={1} numItemsMd={2}>
             {workflowSteps.map((step, index) => (
-              <li
+              <AppPanelRow
                 key={step}
-                className="flex items-center gap-3 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] px-4 py-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]"
+                className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]"
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgba(var(--votuna-accent-soft),0.9)] text-xs font-semibold text-[rgb(var(--votuna-ink))]">
                   {index + 1}
                 </span>
                 <span>{step}</span>
-              </li>
+              </AppPanelRow>
             ))}
-          </ol>
+          </Grid>
         </SurfaceCard>
 
         <SurfaceCard className="fade-up-delay-lg mt-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-                Roadmap
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">
-                Planned features
-              </h2>
-            </div>
-            <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">
-              Priority and scope may change as development continues.
-            </p>
-          </div>
+          <AppSectionHeader
+            eyebrow="Roadmap"
+            title="Planned features"
+            description="Priority and scope may change as development continues."
+          />
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-3">
+          <Grid className="mt-6 gap-4" numItems={1} numItemsLg={3}>
             {plannedFeatureGroups.map((group) => (
-              <div
-                key={group.title}
-                className="rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.8)] p-4"
-              >
-                <p className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{group.title}</p>
+              <AppPanelRow key={group.title} className="p-4">
+                <Text className="text-base font-semibold text-[rgb(var(--votuna-ink))]">{group.title}</Text>
                 <ul className="mt-3 space-y-2 text-sm text-[color:rgb(var(--votuna-ink)/0.72)]">
                   {group.items.map((item) => (
                     <li key={item} className="flex items-start gap-2">
@@ -265,12 +239,10 @@ function Landing() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </AppPanelRow>
             ))}
-          </div>
+          </Grid>
         </SurfaceCard>
-
-        
       </div>
     </main>
   )
@@ -460,7 +432,7 @@ export default function Home() {
     return (
       <main className="mx-auto w-full max-w-6xl px-6 pt-6 pb-16">
         <SurfaceCard>
-          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading session...</p>
+          <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading session...</Text>
         </SurfaceCard>
       </main>
     )
@@ -483,24 +455,15 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-6">
       <div className="fade-up space-y-8">
-        <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-            Dashboard
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold text-[rgb(var(--votuna-ink))]">
-            Playlist dashboard
-          </h1>
-        </div>
+        <AppSectionHeader eyebrow="Dashboard" title="Playlist dashboard" />
 
         <SurfaceCard>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-[color:rgb(var(--votuna-ink)/0.4)]">
-                New Votuna playlist
-              </p>
-              <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+              <SectionEyebrow>New Votuna playlist</SectionEyebrow>
+              <Text className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                 Create a {activeProviderLabel} playlist and enable voting immediately.
-              </p>
+              </Text>
             </div>
             <div className="flex w-full max-w-md flex-wrap items-center gap-3">
               <ClearableTextInput
@@ -535,13 +498,11 @@ export default function Home() {
         </SurfaceCard>
 
         {shouldShowCollaboratorSection ? (
-          <div className="grid gap-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">Collaborator playlists</h2>
-            </div>
+          <div className="space-y-4">
+            <AppSectionHeader title="Collaborator playlists" className="items-center" />
             {isCollaboratorSectionLoading ? (
               <SurfaceCard>
-                <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading collaborator playlists...</p>
+                <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading collaborator playlists...</Text>
               </SurfaceCard>
             ) : (
               <div className="grid gap-4">
@@ -553,38 +514,28 @@ export default function Home() {
                     profilePermalinkUrl: playlist.owner_profile_url,
                   })
                   return (
-                    <SurfaceCard
-                      key={playlist.id}
-                      className="p-5"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          {providerPlaylistUrl ? (
-                            <a
-                              href={providerPlaylistUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-lg font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
-                            >
-                              {playlist.title}
-                            </a>
-                          ) : (
-                            <p className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">
-                              {playlist.title}
-                            </p>
-                          )}
-                          <p className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-                            Shared via {playlist.provider}
-                          </p>
-                        </div>
-                        <Link
-                          href={`/playlists/${playlist.id}`}
-                          className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.15)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.7)]"
-                        >
-                          Open
-                        </Link>
+                    <AppPanelRow key={playlist.id} className="flex flex-wrap items-center justify-between gap-4">
+                      <div>
+                        {providerPlaylistUrl ? (
+                          <a
+                            href={providerPlaylistUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-lg font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
+                          >
+                            {playlist.title}
+                          </a>
+                        ) : (
+                          <Text className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">
+                            {playlist.title}
+                          </Text>
+                        )}
+                        <Text className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                          Shared via {playlist.provider}
+                        </Text>
                       </div>
-                    </SurfaceCard>
+                      <AppRouteButton href={`/playlists/${playlist.id}`}>Open</AppRouteButton>
+                    </AppPanelRow>
                   )
                 })}
                 {pendingInvites.map((invite) => {
@@ -592,39 +543,37 @@ export default function Home() {
                   const isAccepting = action === 'accept'
                   const isDeclining = action === 'decline'
                   return (
-                    <SurfaceCard
+                    <AppPanelRow
                       key={invite.invite_id}
-                      className="p-5"
+                      className="flex flex-wrap items-center justify-between gap-4"
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          <p className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">{invite.playlist_title}</p>
-                          <p className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-                            Pending invite from {invite.owner_display_name || `User ${invite.owner_user_id}`}
-                          </p>
-                          <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.5)]">
-                            {invite.expires_at
-                              ? `Expires ${new Date(invite.expires_at).toLocaleDateString()}`
-                              : 'No expiry'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <AppButton
-                            onClick={() => acceptInviteMutation.mutate(invite.invite_id)}
-                            disabled={Boolean(action)}
-                          >
-                            {isAccepting ? 'Accepting...' : 'Accept'}
-                          </AppButton>
-                          <AppButton
-                            intent="secondary"
-                            onClick={() => declineInviteMutation.mutate(invite.invite_id)}
-                            disabled={Boolean(action)}
-                          >
-                            {isDeclining ? 'Declining...' : 'Decline'}
-                          </AppButton>
-                        </div>
+                      <div>
+                        <Text className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">{invite.playlist_title}</Text>
+                        <Text className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                          Pending invite from {invite.owner_display_name || `User ${invite.owner_user_id}`}
+                        </Text>
+                        <Text className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.5)]">
+                          {invite.expires_at
+                            ? `Expires ${new Date(invite.expires_at).toLocaleDateString()}`
+                            : 'No expiry'}
+                        </Text>
                       </div>
-                    </SurfaceCard>
+                      <div className="flex items-center gap-3">
+                        <AppButton
+                          onClick={() => acceptInviteMutation.mutate(invite.invite_id)}
+                          disabled={Boolean(action)}
+                        >
+                          {isAccepting ? 'Accepting...' : 'Accept'}
+                        </AppButton>
+                        <AppButton
+                          intent="secondary"
+                          onClick={() => declineInviteMutation.mutate(invite.invite_id)}
+                          disabled={Boolean(action)}
+                        >
+                          {isDeclining ? 'Declining...' : 'Decline'}
+                        </AppButton>
+                      </div>
+                    </AppPanelRow>
                   )
                 })}
               </div>
@@ -637,18 +586,16 @@ export default function Home() {
           </div>
         ) : null}
 
-        <div className="grid gap-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-[rgb(var(--votuna-ink))]">Your playlists</h2>
-          </div>
+        <div className="space-y-4">
+          <AppSectionHeader title="Your playlists" className="items-center" />
 
           {providerDashboardLoading ? (
             <SurfaceCard>
-              <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlists...</p>
+              <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlists...</Text>
             </SurfaceCard>
           ) : providerPlaylists.length === 0 ? (
             <SurfaceCard>
-              <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">No playlists found.</p>
+              <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">No playlists found.</Text>
             </SurfaceCard>
           ) : (
             <div className="grid gap-4">
@@ -663,57 +610,50 @@ export default function Home() {
                   providerPlaylistUrl: playlist.url,
                 })
                 return (
-                  <SurfaceCard
+                  <AppPanelRow
                     key={playlist.provider_playlist_id}
-                    className="p-5"
+                    className="flex flex-wrap items-center justify-between gap-4"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div>
-                        {providerPlaylistUrl ? (
-                          <a
-                            href={providerPlaylistUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-lg font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
-                          >
-                            {playlist.title}
-                          </a>
-                        ) : (
-                          <p className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">
-                            {playlist.title}
-                          </p>
-                        )}
-                        <p className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-                          {playlist.track_count ?? 0} tracks
-                          {playlist.is_public === undefined || playlist.is_public === null
-                            ? ''
-                            : playlist.is_public
-                              ? ' - Public'
-                              : ' - Private'}
-                        </p>
-                      </div>
-                      {votuna ? (
-                        <div className="flex items-center gap-3">
-                          <span className="rounded-full bg-[rgba(var(--votuna-accent-soft),0.7)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))]">
-                            Votuna enabled
-                          </span>
-                          <Link
-                            href={`/playlists/${votuna.id}`}
-                            className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.15)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.7)]"
-                          >
-                            Open
-                          </Link>
-                        </div>
-                      ) : (
-                        <AppButton
-                          onClick={() => enableMutation.mutate(playlist)}
-                          disabled={enabling[playlist.provider_playlist_id]}
+                    <div>
+                      {providerPlaylistUrl ? (
+                        <a
+                          href={providerPlaylistUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-lg font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
                         >
-                          {enabling[playlist.provider_playlist_id] ? 'Enabling...' : 'Enable Votuna'}
-                        </AppButton>
+                          {playlist.title}
+                        </a>
+                      ) : (
+                        <Text className="text-lg font-semibold text-[rgb(var(--votuna-ink))]">
+                          {playlist.title}
+                        </Text>
                       )}
+                      <Text className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
+                        {playlist.track_count ?? 0} tracks
+                        {playlist.is_public === undefined || playlist.is_public === null
+                          ? ''
+                          : playlist.is_public
+                            ? ' - Public'
+                            : ' - Private'}
+                      </Text>
                     </div>
-                  </SurfaceCard>
+                    {votuna ? (
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-[rgba(var(--votuna-accent-soft),0.7)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))]">
+                          Votuna enabled
+                        </span>
+                        <AppRouteButton href={`/playlists/${votuna.id}`}>Open</AppRouteButton>
+                      </div>
+                    ) : (
+                      <AppButton
+                        onClick={() => enableMutation.mutate(playlist)}
+                        disabled={enabling[playlist.provider_playlist_id]}
+                      >
+                        {enabling[playlist.provider_playlist_id] ? 'Enabling...' : 'Enable Votuna'}
+                      </AppButton>
+                    )}
+                  </AppPanelRow>
                 )
               })}
             </div>

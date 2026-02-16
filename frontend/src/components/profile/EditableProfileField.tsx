@@ -1,5 +1,7 @@
+import { Text } from '@tremor/react'
+
+import AppButton from '@/components/ui/AppButton'
 import ClearableTextInput from '@/components/ui/ClearableTextInput'
-import PrimaryButton from '@/components/ui/PrimaryButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 
 type EditableProfileFieldProps = {
@@ -34,7 +36,7 @@ export default function EditableProfileField({
 
   return (
     <div className={wrapperClass}>
-      <SectionEyebrow className="tracking-[0.2em]">{label}</SectionEyebrow>
+      <SectionEyebrow compact>{label}</SectionEyebrow>
       <div className={rowClasses}>
         <ClearableTextInput
           value={value}
@@ -44,13 +46,15 @@ export default function EditableProfileField({
           clearAriaLabel={`Clear ${label.toLowerCase()}`}
         />
         {isDirty ? (
-          <PrimaryButton onClick={onSave} disabled={isSaving}>
+          <AppButton intent="primary" onClick={onSave} disabled={isSaving}>
             {isSaving ? 'Saving...' : 'Save'}
-          </PrimaryButton>
+          </AppButton>
         ) : null}
       </div>
       {status ? (
-        <p className="mt-2 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">{status}</p>
+        <Text className="mt-2 text-xs">
+          {status}
+        </Text>
       ) : null}
     </div>
   )

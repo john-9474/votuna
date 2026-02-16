@@ -1,3 +1,7 @@
+import { Text } from '@tremor/react'
+
+import AppLinkButton from '@/components/ui/AppLinkButton'
+
 type GitHubIconProps = {
   className?: string
 }
@@ -21,7 +25,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-paper),0.88)]">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-4 text-xs text-[color:rgb(var(--votuna-ink)/0.62)]">
-        <p>
+        <Text>
           {`Copyright ${year} Votuna. Open source by `}
           <a
             href="https://johnthorlby.com"
@@ -32,19 +36,19 @@ export default function Footer() {
             John Thorlby
           </a>
           .
-        </p>
-        <p className="flex flex-wrap items-center gap-3">
-          <a
+        </Text>
+        <Text className="flex flex-wrap items-center gap-3">
+          <AppLinkButton
             href="https://github.com/john-9474/votuna"
             target="_blank"
             rel="noreferrer"
             aria-label="Votuna GitHub repository"
             title="Votuna GitHub repository"
-            className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.12)] p-1.5 text-[rgb(var(--votuna-ink))] transition hover:border-[color:rgb(var(--votuna-ink)/0.24)] hover:bg-[rgba(var(--votuna-accent-soft),0.35)]"
+            intent="icon"
           >
             <GitHubIcon />
-          </a>
-        </p>
+          </AppLinkButton>
+        </Text>
       </div>
     </footer>
   )

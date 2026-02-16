@@ -1,6 +1,6 @@
 'use client'
 
-import { Tab, TabGroup, TabList } from '@tremor/react'
+import { Tab, TabGroup, TabList, Text } from '@tremor/react'
 import Link from 'next/link'
 import { useParams, usePathname, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
@@ -12,6 +12,7 @@ import SearchSuggestSection from '@/components/playlists/SearchSuggestSection'
 import SuggestionsSection from '@/components/playlists/SuggestionsSection'
 import TracksSection from '@/components/playlists/TracksSection'
 import PageShell from '@/components/ui/PageShell'
+import AppRouteButton from '@/components/ui/AppRouteButton'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import { usePlaylistDetailPage } from '@/lib/hooks/usePlaylistDetailPage'
@@ -101,7 +102,7 @@ export default function PlaylistDetailPage() {
     return (
       <PageShell>
         <SurfaceCard>
-          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlist...</p>
+          <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading playlist...</Text>
         </SurfaceCard>
       </PageShell>
     )
@@ -111,13 +112,10 @@ export default function PlaylistDetailPage() {
     return (
       <PageShell>
         <SurfaceCard>
-          <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Playlist not found.</p>
-          <Link
-            href="/"
-            className="mt-4 inline-flex items-center rounded-full bg-[rgb(var(--votuna-ink))] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-paper))]"
-          >
+          <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Playlist not found.</Text>
+          <AppRouteButton href="/" intent="solid" className="mt-4">
             Back to dashboard
-          </Link>
+          </AppRouteButton>
         </SurfaceCard>
       </PageShell>
     )
@@ -144,17 +142,14 @@ export default function PlaylistDetailPage() {
               </h1>
             )}
             {state.playlist.description ? (
-              <p className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+              <Text className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                 {state.playlist.description}
-              </p>
+              </Text>
             ) : null}
           </div>
-          <Link
-            href="/"
-            className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.15)] px-4 py-2 text-xs font-semibold text-[rgb(var(--votuna-ink))] hover:bg-[rgba(var(--votuna-paper),0.7)]"
-          >
+          <AppRouteButton href="/">
             Back
-          </Link>
+          </AppRouteButton>
         </div>
 
         <TabGroup index={activeTabIndex} onIndexChange={handleTabChange}>
@@ -169,7 +164,7 @@ export default function PlaylistDetailPage() {
           <div className="space-y-6">
             {!state.isCollaborative ? (
               <SurfaceCard>
-                <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+                <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
                   No collaborators, invite someone in{' '}
                   <Link
                     href={buildTabHref('settings')}
@@ -178,7 +173,7 @@ export default function PlaylistDetailPage() {
                     settings
                   </Link>{' '}
                   to turn this into a collaborative playlist
-                </p>
+                </Text>
               </SurfaceCard>
             ) : null}
             <SearchSuggestSection

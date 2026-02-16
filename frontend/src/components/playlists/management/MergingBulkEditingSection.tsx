@@ -1,7 +1,9 @@
-import { Card, Select, SelectItem, Switch, Tab, TabGroup, TabList } from '@tremor/react'
+import { Card, Col, Grid, Select, SelectItem, Switch, Tab, TabGroup, TabList, Text } from '@tremor/react'
 
-import ClearableInput from '@/components/ui/ClearableInput'
 import AppButton from '@/components/ui/AppButton'
+import AppPanelRow from '@/components/ui/AppPanelRow'
+import AppSectionHeader from '@/components/ui/AppSectionHeader'
+import ClearableTextInput from '@/components/ui/ClearableTextInput'
 import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
@@ -71,15 +73,14 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
 
   return (
     <SurfaceCard>
-      <SectionEyebrow>Merging</SectionEyebrow>
-      <h3 className="mt-2 text-2xl font-semibold text-[rgb(var(--votuna-ink))]">Copy songs between playlists</h3>
+      <AppSectionHeader eyebrow="Merging" title="Copy songs between playlists" />
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)]">
-        <div className="space-y-5">
+      <Grid className="mt-6 gap-6" numItems={1} numItemsLg={3}>
+        <Col numColSpanLg={2} className="space-y-5">
           <Card className="p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+            <SectionEyebrow compact tone="strong">
               What do you want to do?
-            </p>
+            </SectionEyebrow>
             <TabGroup
               index={actionTabIndex}
               onIndexChange={(index) =>
@@ -98,15 +99,15 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
           </Card>
 
           <Card className="p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+            <SectionEyebrow compact tone="strong">
               Choose playlists
-            </p>
+            </SectionEyebrow>
 
             {action.value === 'add_to_this_playlist' ? (
               <div className="mt-3 space-y-4">
-                <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
+                <Text>
                   Pick the playlist to copy songs from.
-                </p>
+                </Text>
                 <TabGroup
                   index={sourceModeTabIndex}
                   onIndexChange={(index) =>
@@ -134,7 +135,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         playlists.otherPlaylist.search.run()
                       }}
                     >
-                      <ClearableInput
+                      <ClearableTextInput
                         value={playlists.otherPlaylist.search.input}
                         onValueChange={playlists.otherPlaylist.search.setInput}
                         containerClassName="flex-1"
@@ -152,9 +153,9 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         {playlists.otherPlaylist.search.isPending ? 'Searching...' : 'Search'}
                       </AppButton>
                     </form>
-                    <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.58)]">
+                    <Text className="text-xs">
                       Enter playlist text to search, or paste a playlist URL.
-                    </p>
+                    </Text>
                     {playlists.otherPlaylist.search.status ? (
                       <StatusCallout tone="error" title="Search status" className="mt-2">
                         {playlists.otherPlaylist.search.status}
@@ -190,9 +191,9 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
 
                 {!playlists.destination.isCreatingNew ? (
                   <div>
-                    <p className="mb-2 text-sm text-[color:rgb(var(--votuna-ink)/0.65)]">
+                    <Text className="mb-2">
                       Pick the destination playlist.
-                    </p>
+                    </Text>
                     <PlaylistGridPicker
                       options={playlists.otherPlaylist.options}
                       selectedKey={playlists.otherPlaylist.selectedKey}
@@ -201,12 +202,12 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                     />
                   </div>
                 ) : (
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <Grid className="gap-4" numItems={1} numItemsSm={2}>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+                      <SectionEyebrow compact tone="strong">
                         New playlist name
-                      </p>
-                      <ClearableInput
+                      </SectionEyebrow>
+                      <ClearableTextInput
                         value={playlists.destination.createForm.title}
                         onValueChange={playlists.destination.createForm.setTitle}
                         className="mt-2"
@@ -215,10 +216,10 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       />
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+                      <SectionEyebrow compact tone="strong">
                         Description
-                      </p>
-                      <ClearableInput
+                      </SectionEyebrow>
+                      <ClearableTextInput
                         value={playlists.destination.createForm.description}
                         onValueChange={playlists.destination.createForm.setDescription}
                         className="mt-2"
@@ -226,23 +227,25 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         clearAriaLabel="Clear playlist description"
                       />
                     </div>
-                    <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)] sm:col-span-2">
-                      <Switch
-                        checked={playlists.destination.createForm.isPublic}
-                        onChange={playlists.destination.createForm.setIsPublic}
-                      />
-                      Create as public playlist
-                    </label>
-                  </div>
+                    <Col numColSpanSm={2}>
+                      <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]">
+                        <Switch
+                          checked={playlists.destination.createForm.isPublic}
+                          onChange={playlists.destination.createForm.setIsPublic}
+                        />
+                        Create as public playlist
+                      </label>
+                    </Col>
+                  </Grid>
                 )}
               </div>
             )}
           </Card>
 
           <Card className="p-5">
-            <p className="text-xs uppercase tracking-[0.2em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+            <SectionEyebrow compact tone="strong">
               Choose songs
-            </p>
+            </SectionEyebrow>
             {!steps.canProceedFromPlaylists ? (
               <StatusCallout tone="info" title="Selection required" className="mt-3">
                 Choose playlists first to load song options.
@@ -296,13 +299,13 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <p className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Pick songs</p>
-                        <p className="mt-1 text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                        <Text className="text-sm font-semibold text-[rgb(var(--votuna-ink))]">Pick songs</Text>
+                        <Text className="mt-1 text-xs">
                           Selected songs: {sourcePicker.selectedSongIds.length}
-                        </p>
+                        </Text>
                       </div>
                       <div className="w-full max-w-sm">
-                        <ClearableInput
+                        <ClearableTextInput
                           value={sourcePicker.search}
                           onValueChange={sourcePicker.setSearch}
                           placeholder="Search songs in source playlist"
@@ -318,11 +321,9 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                     ) : null}
 
                     {sourcePicker.isLoading ? (
-                      <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">Loading songs...</p>
+                      <Text>Loading songs...</Text>
                     ) : sourcePicker.tracks.length === 0 ? (
-                      <p className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-                        No songs found for this source playlist.
-                      </p>
+                      <Text>No songs found for this source playlist.</Text>
                     ) : (
                       <div className="space-y-2">
                         <label className="inline-flex items-center gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.62)]">
@@ -334,33 +335,32 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                           {allVisibleTracksSelected ? 'Unselect all on this page' : 'Select all on this page'}
                         </label>
                         {sourcePicker.tracks.map((track) => (
-                          <label
-                            key={track.provider_track_id}
-                            className="flex items-center gap-3 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.08)] px-4 py-3 text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedSongIdSet.has(track.provider_track_id)}
-                              onChange={() => sourcePicker.toggleSelectedSong(track.provider_track_id)}
-                            />
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-[rgb(var(--votuna-ink))]">
-                                {track.title}
-                              </p>
-                              <p className="truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
-                                {track.artist || 'Unknown artist'}
-                                {track.genre ? ` - ${track.genre}` : ''}
-                              </p>
-                            </div>
+                          <label key={track.provider_track_id} className="block">
+                            <AppPanelRow className="flex items-center gap-3 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={selectedSongIdSet.has(track.provider_track_id)}
+                                onChange={() => sourcePicker.toggleSelectedSong(track.provider_track_id)}
+                              />
+                              <div className="min-w-0">
+                                <Text className="truncate font-semibold text-[rgb(var(--votuna-ink))]">
+                                  {track.title}
+                                </Text>
+                                <Text className="truncate text-xs">
+                                  {track.artist || 'Unknown artist'}
+                                  {track.genre ? ` - ${track.genre}` : ''}
+                                </Text>
+                              </div>
+                            </AppPanelRow>
                           </label>
                         ))}
                       </div>
                     )}
 
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-[color:rgb(var(--votuna-ink)/0.56)]">
+                      <Text className="text-xs">
                         Showing {rangeStart}-{rangeEnd} of {sourceTrackTotalCount}
-                      </p>
+                      </Text>
                       <div className="flex gap-2">
                         <AppButton
                           intent="ghost"
@@ -387,16 +387,16 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
               </div>
             )}
           </Card>
-        </div>
+        </Col>
 
-        <div>
+        <Col numColSpanLg={1}>
           <ReviewRunPanel
             sourceLabel={playlists.sourceLabel}
             destinationLabel={playlists.destinationLabel}
             review={management.review}
           />
-        </div>
-      </div>
+        </Col>
+      </Grid>
     </SurfaceCard>
   )
 }
