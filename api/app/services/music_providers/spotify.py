@@ -7,7 +7,7 @@ import hashlib
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
-from typing import Any, Awaitable, Callable, Sequence, TypeVar
+from typing import Any, Awaitable, Callable, Coroutine, Sequence, TypeVar
 from urllib.parse import urlparse
 
 import httpx
@@ -139,7 +139,7 @@ class SpotifyProvider(MusicProviderClient):
     async def _run_deduped_request(
         cls,
         key: str,
-        operation: Callable[[], Awaitable[list[Any]]],
+        operation: Callable[[], Coroutine[Any, Any, list[Any]]],
     ) -> list[Any]:
         created_task = False
         async with cls._cache_lock:
@@ -370,9 +370,10 @@ class SpotifyProvider(MusicProviderClient):
             next_url: str | None = "/me/playlists"
             params: dict[str, int] | None = {"limit": 50}
             async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
-                while next_url:
+                while next_url is not None:
+                    request_url = next_url
                     response = await self._request_with_rate_limit_retry(
-                        lambda: client.get(next_url, headers=self._headers(), params=params)
+                        lambda: client.get(request_url, headers=self._headers(), params=params)
                     )
                     self._raise_for_status(response)
                     payload = response.json()
@@ -507,9 +508,10 @@ class SpotifyProvider(MusicProviderClient):
             next_url: str | None = f"/playlists/{playlist_id}/items"
             params: dict[str, int | str] | None = {"limit": 100, "offset": 0}
             async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
-                while next_url:
+                while next_url is not None:
+                    request_url = next_url
                     response = await self._request_with_rate_limit_retry(
-                        lambda: client.get(next_url, headers=self._headers(), params=params)
+                        lambda: client.get(request_url, headers=self._headers(), params=params)
                     )
                     self._raise_for_status(response)
                     payload = response.json()
