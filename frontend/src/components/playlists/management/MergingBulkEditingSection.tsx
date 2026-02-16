@@ -23,6 +23,8 @@ const SONG_SCOPE_OPTIONS: Array<{ value: PlaylistManagementState['songScope']['v
   { value: 'artist', label: 'Only specific artists' },
   { value: 'songs', label: 'Pick songs manually' },
 ]
+const TAB_BUTTON_CLASS =
+  'border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]'
 
 export default function MergingBulkEditingSection({ management }: MergingBulkEditingSectionProps) {
   const { action, playlists, songScope, steps } = management
@@ -88,10 +90,10 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
               }
             >
               <TabList variant="solid" className="mt-3">
-                <Tab className="border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]">
+                <Tab className={TAB_BUTTON_CLASS}>
                   Add songs to this playlist
                 </Tab>
-                <Tab className="border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]">
+                <Tab className={TAB_BUTTON_CLASS}>
                   Copy songs to another playlist
                 </Tab>
               </TabList>
@@ -115,8 +117,8 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                   }
                 >
                   <TabList variant="solid">
-                    <Tab>My playlists</Tab>
-                    <Tab>Search playlists</Tab>
+                    <Tab className={TAB_BUTTON_CLASS}>My playlists</Tab>
+                    <Tab className={TAB_BUTTON_CLASS}>Search playlists</Tab>
                   </TabList>
                 </TabGroup>
 
@@ -184,8 +186,8 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                   }
                 >
                   <TabList variant="solid">
-                    <Tab>Existing playlist</Tab>
-                    <Tab>Create new playlist</Tab>
+                    <Tab className={TAB_BUTTON_CLASS}>Existing playlist</Tab>
+                    <Tab className={TAB_BUTTON_CLASS}>Create new playlist</Tab>
                   </TabList>
                 </TabGroup>
 
