@@ -19,6 +19,7 @@ type SearchSuggestSectionProps = {
   onSearchQueryChange: (value: string) => void
   onSearchTracks: () => void
   isSearching: boolean
+  isSearchHydrating: boolean
   searchStatus: string
   searchResults: ProviderTrack[]
   optimisticSuggestedTrackIds: string[]
@@ -31,6 +32,7 @@ type SearchSuggestSectionProps = {
   onLinkSuggestionUrlChange: (value: string) => void
   onSuggestFromLink: () => void
   suggestStatus: string
+  showRecommendations: boolean
   recommendedTracks: ProviderTrack[]
   recommendationsStatus: string
   isRecommendationsLoading: boolean
@@ -53,6 +55,8 @@ const getTrackLinkPlaceholder = (provider: string) => {
   const normalized = provider.trim().toLowerCase()
   if (normalized === 'spotify') return 'https://open.spotify.com/track/<track-id>'
   if (normalized === 'soundcloud') return 'https://soundcloud.com/artist/track-name'
+  if (normalized === 'apple') return 'https://music.apple.com/us/song/<song>/<id>'
+  if (normalized === 'tidal') return 'https://listen.tidal.com/track/<track-id>'
   return 'Paste a track link'
 }
 
@@ -63,6 +67,7 @@ export default function SearchSuggestSection({
   onSearchQueryChange,
   onSearchTracks,
   isSearching,
+  isSearchHydrating,
   searchStatus,
   searchResults,
   optimisticSuggestedTrackIds,
@@ -75,6 +80,7 @@ export default function SearchSuggestSection({
   onLinkSuggestionUrlChange,
   onSuggestFromLink,
   suggestStatus,
+  showRecommendations,
   recommendedTracks,
   recommendationsStatus,
   isRecommendationsLoading,
@@ -84,6 +90,7 @@ export default function SearchSuggestSection({
   isRecommendationActionPending,
 }: SearchSuggestSectionProps) {
   const providerLabel = getProviderLabel(provider)
+  const isTidalProvider = provider.trim().toLowerCase() === 'tidal'
   const isTrackSuggested = (providerTrackId: string) =>
     optimisticSuggestedTrackIds.includes(providerTrackId) ||
     pendingSuggestionTrackIds.includes(providerTrackId)
@@ -129,11 +136,16 @@ export default function SearchSuggestSection({
 
       {searchResults.length > 0 ? (
         <div className="mt-4 space-y-3">
-          {searchResults.map((track) => (
+          {searchResults.map((track) => {
+            const isMetadataLoading =
+              isTidalProvider &&
+              isSearchHydrating &&
+              (!track.artist || !track.artwork_url)
+            return (
             <AppPanelRow key={track.provider_track_id} className="p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <TrackArtwork artworkUrl={track.artwork_url} title={track.title} />
+                  <TrackArtwork artworkUrl={track.artwork_url} title={track.title} isLoading={isMetadataLoading} />
                   <div className="min-w-0">
                     {track.url ? (
                       <a
@@ -147,9 +159,18 @@ export default function SearchSuggestSection({
                     ) : (
                       <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
                     )}
-                    <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
-                      {track.artist || 'Unknown artist'}
-                    </Text>
+                    <div className="mt-1 h-4">
+                      {isMetadataLoading ? (
+                        <div
+                          aria-hidden="true"
+                          className="h-3 w-24 animate-pulse rounded bg-[rgba(var(--votuna-ink),0.1)]"
+                        />
+                      ) : (
+                        <Text className="truncate text-xs leading-4 text-[color:rgb(var(--votuna-ink)/0.6)]">
+                          {track.artist || 'Unknown artist'}
+                        </Text>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -190,7 +211,8 @@ export default function SearchSuggestSection({
                 </div>
               </div>
             </AppPanelRow>
-          ))}
+            )
+          })}
         </div>
       ) : null}
 
@@ -226,141 +248,145 @@ export default function SearchSuggestSection({
         </StatusCallout>
       ) : null}
 
-      <div className="mt-6 border-t border-[color:rgb(var(--votuna-ink)/0.08)] pt-5">
-        <AppSectionHeader
-          eyebrow="Suggested for this playlist"
-          actions={
-            <AppButton
-              intent="secondary"
-              onClick={onRefreshRecommendations}
-              disabled={isRecommendationsLoading || inPlaylistTrackIds.length === 0}
-            >
-              Refresh
-            </AppButton>
-          }
-          className="items-center"
-          descriptionClassName="mt-0"
-        />
+      {showRecommendations ? (
+        <>
+          <div className="mt-6 border-t border-[color:rgb(var(--votuna-ink)/0.08)] pt-5">
+            <AppSectionHeader
+              eyebrow="Suggested for this playlist"
+              actions={
+                <AppButton
+                  intent="secondary"
+                  onClick={onRefreshRecommendations}
+                  disabled={isRecommendationsLoading || inPlaylistTrackIds.length === 0}
+                >
+                  Refresh
+                </AppButton>
+              }
+              className="items-center"
+              descriptionClassName="mt-0"
+            />
 
-        {inPlaylistTrackIds.length === 0 ? (
-          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
-            Add tracks to this playlist to generate recommendations.
-          </Text>
-        ) : isRecommendationsLoading && recommendedTracks.length === 0 ? (
-          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">Loading recommendations...</Text>
-        ) : recommendedTracks.length === 0 ? (
-          <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">No more recommendations right now.</Text>
-        ) : (
-          <div className="mt-4 -mx-1 snap-x snap-mandatory overflow-x-auto pb-2 scroll-smooth">
-            <div className="mx-auto flex w-fit min-w-max gap-4 px-1">
-              {recommendedTracks.map((track) => {
-                const inPlaylist = isTrackInPlaylist(track.provider_track_id)
-                const suggested = isCollaborative && isTrackSuggested(track.provider_track_id)
-                const disableAccept =
-                  isRecommendationActionPending ||
-                  isRecommendationsLoading ||
-                  isSuggestPending ||
-                  inPlaylist ||
-                  suggested
+            {inPlaylistTrackIds.length === 0 ? (
+              <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">
+                Add tracks to this playlist to generate recommendations.
+              </Text>
+            ) : isRecommendationsLoading && recommendedTracks.length === 0 ? (
+              <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">Loading recommendations...</Text>
+            ) : recommendedTracks.length === 0 ? (
+              <Text className="mt-3 text-sm text-[color:rgb(var(--votuna-ink)/0.62)]">No more recommendations right now.</Text>
+            ) : (
+              <div className="mt-4 -mx-1 snap-x snap-mandatory overflow-x-auto pb-2 scroll-smooth">
+                <div className="mx-auto flex w-fit min-w-max gap-4 px-1">
+                  {recommendedTracks.map((track) => {
+                    const inPlaylist = isTrackInPlaylist(track.provider_track_id)
+                    const suggested = isCollaborative && isTrackSuggested(track.provider_track_id)
+                    const disableAccept =
+                      isRecommendationActionPending ||
+                      isRecommendationsLoading ||
+                      isSuggestPending ||
+                      inPlaylist ||
+                      suggested
 
-                return (
-                  <div
-                    key={`recommended-${track.provider_track_id}`}
-                    className="w-[180px] flex-shrink-0 snap-start"
-                  >
-                    <div className="relative overflow-hidden rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.75)]">
-                      {track.artwork_url ? (
-                        <Image
-                          src={track.artwork_url}
-                          alt={`${track.title} artwork`}
-                          width={176}
-                          height={176}
-                          unoptimized
-                          className="h-44 w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-44 w-full items-center justify-center bg-[rgba(var(--votuna-ink),0.05)] text-[10px] uppercase tracking-[0.16em] text-[color:rgb(var(--votuna-ink)/0.45)]">
-                          No Art
+                    return (
+                      <div
+                        key={`recommended-${track.provider_track_id}`}
+                        className="w-[180px] flex-shrink-0 snap-start"
+                      >
+                        <div className="relative overflow-hidden rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.75)]">
+                          {track.artwork_url ? (
+                            <Image
+                              src={track.artwork_url}
+                              alt={`${track.title} artwork`}
+                              width={176}
+                              height={176}
+                              unoptimized
+                              className="h-44 w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-44 w-full items-center justify-center bg-[rgba(var(--votuna-ink),0.05)] text-[10px] uppercase tracking-[0.16em] text-[color:rgb(var(--votuna-ink)/0.45)]">
+                              No Art
+                            </div>
+                          )}
+                          {track.url ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onPlayTrack({
+                                  key: `recommended-${track.provider_track_id}`,
+                                  title: track.title,
+                                  artist: track.artist,
+                                  url: track.url,
+                                  artworkUrl: track.artwork_url,
+                                })
+                              }
+                              aria-label={`Play ${track.title}`}
+                              className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/25 focus:bg-black/25"
+                            >
+                              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/20 text-white backdrop-blur-sm">
+                                <RiPlayFill className="h-6 w-6" />
+                              </span>
+                            </button>
+                          ) : null}
                         </div>
-                      )}
-                      {track.url ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onPlayTrack({
-                              key: `recommended-${track.provider_track_id}`,
-                              title: track.title,
-                              artist: track.artist,
-                              url: track.url,
-                              artworkUrl: track.artwork_url,
-                            })
-                          }
-                          aria-label={`Play ${track.title}`}
-                          className="absolute inset-0 flex items-center justify-center bg-black/0 transition hover:bg-black/25 focus:bg-black/25"
-                        >
-                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/45 bg-white/20 text-white backdrop-blur-sm">
-                            <RiPlayFill className="h-6 w-6" />
-                          </span>
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="mt-2 min-w-0">
-                      {track.url ? (
-                        <a
-                          href={track.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block truncate text-sm font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
-                        >
-                          {track.title}
-                        </a>
-                      ) : (
-                        <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
-                      )}
-                      <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
-                        {track.artist || 'Unknown artist'}
-                      </Text>
-                    </div>
-                    <div className="mt-3 flex items-center justify-center gap-2">
-                      <AppButton
-                        type="button"
-                        intent="icon"
-                        onClick={() => onAcceptRecommendation(track)}
-                        title={isCollaborative ? 'Suggest track' : 'Add track'}
-                        aria-label={isCollaborative ? 'Suggest track' : 'Add track'}
-                        disabled={disableAccept}
-                        color="emerald"
-                      >
-                        <RiThumbUpLine className="h-5 w-5" />
-                      </AppButton>
-                      <AppButton
-                        type="button"
-                        intent="icon"
-                        onClick={() => onDeclineRecommendation(track)}
-                        title="Decline recommendation"
-                        aria-label="Decline recommendation"
-                        disabled={isRecommendationActionPending || isRecommendationsLoading}
-                        color="rose"
-                      >
-                        <RiThumbDownLine className="h-5 w-5" />
-                      </AppButton>
-                    </div>
-                    {inPlaylist ? (
-                      <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">In playlist</Text>
-                    ) : suggested ? (
-                      <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">Suggested</Text>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
+                        <div className="mt-2 min-w-0">
+                          {track.url ? (
+                            <a
+                              href={track.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block truncate text-sm font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
+                            >
+                              {track.title}
+                            </a>
+                          ) : (
+                            <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">{track.title}</Text>
+                          )}
+                          <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
+                            {track.artist || 'Unknown artist'}
+                          </Text>
+                        </div>
+                        <div className="mt-3 flex items-center justify-center gap-2">
+                          <AppButton
+                            type="button"
+                            intent="icon"
+                            onClick={() => onAcceptRecommendation(track)}
+                            title={isCollaborative ? 'Suggest track' : 'Add track'}
+                            aria-label={isCollaborative ? 'Suggest track' : 'Add track'}
+                            disabled={disableAccept}
+                            color="emerald"
+                          >
+                            <RiThumbUpLine className="h-5 w-5" />
+                          </AppButton>
+                          <AppButton
+                            type="button"
+                            intent="icon"
+                            onClick={() => onDeclineRecommendation(track)}
+                            title="Decline recommendation"
+                            aria-label="Decline recommendation"
+                            disabled={isRecommendationActionPending || isRecommendationsLoading}
+                            color="rose"
+                          >
+                            <RiThumbDownLine className="h-5 w-5" />
+                          </AppButton>
+                        </div>
+                        {inPlaylist ? (
+                          <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">In playlist</Text>
+                        ) : suggested ? (
+                          <Text className="mt-2 text-center text-xs text-[color:rgb(var(--votuna-ink)/0.55)]">Suggested</Text>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      {recommendationsStatus ? (
-        <StatusCallout tone="error" title="Recommendations status" className="mt-3">
-          {recommendationsStatus}
-        </StatusCallout>
+          {recommendationsStatus ? (
+            <StatusCallout tone="error" title="Recommendations status" className="mt-3">
+              {recommendationsStatus}
+            </StatusCallout>
+          ) : null}
+        </>
       ) : null}
     </SurfaceCard>
   )

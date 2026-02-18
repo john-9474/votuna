@@ -3,9 +3,10 @@ import Image from 'next/image'
 type TrackArtworkProps = {
   artworkUrl?: string | null
   title: string
+  isLoading?: boolean
 }
 
-export default function TrackArtwork({ artworkUrl, title }: TrackArtworkProps) {
+export default function TrackArtwork({ artworkUrl, title, isLoading = false }: TrackArtworkProps) {
   if (artworkUrl) {
     return (
       <Image
@@ -15,6 +16,14 @@ export default function TrackArtwork({ artworkUrl, title }: TrackArtworkProps) {
         height={40}
         unoptimized
         className="h-10 w-10 flex-shrink-0 rounded-lg object-cover"
+      />
+    )
+  }
+  if (isLoading) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-10 w-10 flex-shrink-0 animate-pulse rounded-lg border border-[color:rgb(var(--votuna-ink)/0.08)] bg-[rgba(var(--votuna-ink),0.08)]"
       />
     )
   }

@@ -1,3 +1,5 @@
+import pytest
+
 from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
 from app.crud.votuna_track_recommendation_decline import (
@@ -761,13 +763,15 @@ def test_recommendations_default_limit_and_filters(
     assert "track-related-4" not in ids  # declined by current user
 
 
-def test_recommendations_for_spotify_return_empty(
+@pytest.mark.parametrize("provider", ["spotify", "apple"])
+def test_recommendations_disabled_providers_return_empty(
     auth_client,
     db_session,
     votuna_playlist,
     provider_stub,
+    provider,
 ):
-    votuna_playlist.provider = "spotify"
+    votuna_playlist.provider = provider
     db_session.add(votuna_playlist)
     db_session.commit()
 
@@ -777,6 +781,20 @@ def test_recommendations_for_spotify_return_empty(
     assert response.status_code == 200
     assert response.json() == []
     assert provider_stub.related_tracks_calls == []
+
+
+def test_recommendations_enabled_for_tidal(auth_client, db_session, votuna_playlist, provider_stub):
+    votuna_playlist.provider = "tidal"
+    db_session.add(votuna_playlist)
+    db_session.commit()
+
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) > 0
+    assert provider_stub.related_tracks_calls != []
 
 
 def test_recommendation_decline_is_idempotent(auth_client, db_session, votuna_playlist, user):

@@ -37,6 +37,7 @@ export default function CollaboratorsSection({
   memberActions,
 }: CollaboratorsSectionProps) {
   const [copyStatus, setCopyStatus] = useState('')
+  const canSearchProviderUsers = invites.canSearchProviderUsers
 
   const copyInviteLink = async (url: string) => {
     try {
@@ -227,7 +228,11 @@ export default function CollaboratorsSection({
           <AppSectionHeader
             eyebrow="Invite collaborator"
             title="Find a user"
-            description="Search by name or user ID and select a result to send an invite."
+            description={
+              canSearchProviderUsers
+                ? 'Search by name or user ID and select a result to send an invite.'
+                : 'Provider user lookup is unavailable for this playlist provider. Share a link instead.'
+            }
             actions={
               <AppButton intent="ghost" onClick={invites.modal.close}>
                 Close
@@ -236,25 +241,27 @@ export default function CollaboratorsSection({
             className="items-start"
           />
 
-          <form
-            className="mt-6 flex flex-wrap items-center gap-3"
-            onSubmit={(event) => {
-              event.preventDefault()
-              if (invites.search.isLoading) return
-              invites.search.run()
-            }}
-          >
-            <ClearableTextInput
-              value={invites.search.query}
-              onValueChange={invites.search.setQuery}
-              placeholder="Search users"
-              containerClassName="flex-1"
-              clearAriaLabel="Clear user search"
-            />
-            <AppButton type="submit" disabled={invites.search.isLoading}>
-              {invites.search.isLoading ? 'Searching...' : 'Search'}
-            </AppButton>
-          </form>
+          {canSearchProviderUsers ? (
+            <form
+              className="mt-6 flex flex-wrap items-center gap-3"
+              onSubmit={(event) => {
+                event.preventDefault()
+                if (invites.search.isLoading) return
+                invites.search.run()
+              }}
+            >
+              <ClearableTextInput
+                value={invites.search.query}
+                onValueChange={invites.search.setQuery}
+                placeholder="Search users"
+                containerClassName="flex-1"
+                clearAriaLabel="Clear user search"
+              />
+              <AppButton type="submit" disabled={invites.search.isLoading}>
+                {invites.search.isLoading ? 'Searching...' : 'Search'}
+              </AppButton>
+            </form>
+          ) : null}
 
           {invites.search.error ? (
             <StatusCallout tone="error" title="Search failed" className="mt-3">
@@ -272,7 +279,7 @@ export default function CollaboratorsSection({
             </StatusCallout>
           ) : null}
 
-          {invites.search.results.length > 0 ? (
+          {canSearchProviderUsers && invites.search.results.length > 0 ? (
             <div className="mt-4 space-y-2">
               {invites.search.results.map((candidate) => (
                 <AppPanelRow
@@ -324,6 +331,11 @@ export default function CollaboratorsSection({
 
           <div className="mt-4 rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.1)] p-4">
             <Subtitle>Or share an invite link.</Subtitle>
+            {!canSearchProviderUsers ? (
+              <Text className="mt-2 text-xs">
+                Targeted user invites are unavailable for this provider right now.
+              </Text>
+            ) : null}
             {invites.search.hasSearched && invites.search.results.length === 0 ? (
               <Text className="mt-2 text-xs">
                 No users found for that search, so a link is the best option.

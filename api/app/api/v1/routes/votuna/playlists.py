@@ -556,5 +556,10 @@ async def remove_votuna_track(
     except ProviderAuthError:
         raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
     except ProviderAPIError as exc:
+        if exc.status_code == status.HTTP_501_NOT_IMPLEMENTED:
+            raise HTTPException(
+                status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                detail=str(exc),
+            ) from exc
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

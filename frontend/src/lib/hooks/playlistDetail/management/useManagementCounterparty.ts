@@ -23,6 +23,8 @@ const normalizePlaylistUrl = (value: string) => {
   if (/^https?:\/\//i.test(trimmed)) return trimmed
   if (/^soundcloud\.com\//i.test(trimmed)) return `https://${trimmed}`
   if (/^open\.spotify\.com\/playlist\//i.test(trimmed)) return `https://${trimmed}`
+  if (/^music\.apple\.com\//i.test(trimmed)) return `https://${trimmed}`
+  if (/^(listen\.)?tidal\.com\/.*playlist\//i.test(trimmed)) return `https://${trimmed}`
   return ''
 }
 

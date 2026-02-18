@@ -6,6 +6,7 @@ from app.crud.votuna_playlist_member import votuna_playlist_member_crud
 from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
 from app.crud.votuna_track_addition import votuna_track_addition_crud
 from app.crud.votuna_track_suggestion import votuna_track_suggestion_crud
+from app.services.music_providers import ProviderAPIError
 
 
 def _set_personal_mode(db_session, playlist) -> None:
@@ -148,6 +149,31 @@ def test_remove_track_non_owner_forbidden(other_auth_client, votuna_playlist, pr
         f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/{provider_stub.tracks[0].provider_track_id}"
     )
     assert response.status_code == 403
+
+
+def test_remove_track_unsupported_provider_returns_405(
+    auth_client,
+    db_session,
+    votuna_playlist,
+    provider_stub,
+    monkeypatch,
+):
+    votuna_playlist.provider = "apple"
+    db_session.add(votuna_playlist)
+    db_session.commit()
+
+    async def _raise_not_supported(self, provider_playlist_id: str, track_ids):
+        raise ProviderAPIError(
+            "Apple Music track removal is not supported for library playlists",
+            status_code=501,
+        )
+
+    monkeypatch.setattr(provider_stub, "remove_tracks", _raise_not_supported)
+    response = auth_client.delete(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/{provider_stub.tracks[0].provider_track_id}"
+    )
+    assert response.status_code == 405
+    assert "not supported" in response.json()["detail"].lower()
 
 
 def test_list_votuna_tracks_includes_suggester(auth_client, db_session, votuna_playlist, user, provider_stub):

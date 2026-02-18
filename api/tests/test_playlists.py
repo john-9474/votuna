@@ -239,3 +239,56 @@ def test_provider_auth_refresh_retries_with_new_token_for_spotify(
     refreshed_user = user_crud.get(db_session, user.id)
     assert refreshed_user is not None
     assert refreshed_user.access_token == "fresh-token"
+
+
+def test_provider_auth_refresh_retries_with_new_token_for_tidal(
+    auth_client,
+    provider_stub,
+    user,
+    db_session,
+    monkeypatch,
+):
+    from app.services.music_providers import session as provider_session
+
+    seen_tokens: list[str] = []
+
+    async def _list_playlists(self):
+        seen_tokens.append(self.access_token)
+        if self.access_token == "expired-token":
+            raise ProviderAuthError("TIDAL authorization expired or invalid")
+        return provider_stub.playlists
+
+    async def _refresh_tidal_access_token(target_user, db):
+        updated = user_crud.update(
+            db_session,
+            target_user,
+            {
+                "access_token": "fresh-token",
+                "refresh_token": target_user.refresh_token,
+                "token_expires_at": None,
+            },
+        )
+        return updated.access_token
+
+    user_crud.update(
+        db_session,
+        user,
+        {
+            "access_token": "expired-token",
+            "refresh_token": "refresh-token",
+            "token_expires_at": None,
+        },
+    )
+    monkeypatch.setattr(provider_stub, "list_playlists", _list_playlists)
+    monkeypatch.setattr(
+        provider_session,
+        "refresh_tidal_access_token",
+        _refresh_tidal_access_token,
+    )
+
+    response = auth_client.get("/api/v1/playlists/providers/tidal")
+    assert response.status_code == 200
+    assert seen_tokens == ["expired-token", "fresh-token"]
+    refreshed_user = user_crud.get(db_session, user.id)
+    assert refreshed_user is not None
+    assert refreshed_user.access_token == "fresh-token"

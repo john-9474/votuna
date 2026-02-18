@@ -4,13 +4,15 @@ FastAPI backend for Votuna's collaborative playlist workflows.
 
 ## Current Scope
 
-- OAuth login/callback + session cookie auth
+- OAuth login/callback + session cookie auth (`apple`, `spotify`, `soundcloud`, `tidal`)
 - Provider playlist listing and creation APIs
 - Votuna playlist enablement and settings
 - Suggestions and voting with collaborator/member support
+- Recommendation endpoint with short-lived caching and dedupe/ranking
 - Playlist management transfer endpoints (import/export with preview and execute)
 
-Runtime provider client support currently includes **Spotify** and **SoundCloud** (`get_music_provider`), while API schemas also include additional provider enums for forward compatibility.
+Runtime provider client support includes **Spotify**, **SoundCloud**, **Apple Music**, and **TIDAL** (`get_music_provider`).
+Frontend currently exposes login buttons for Spotify, SoundCloud, and TIDAL; Apple login is intentionally disabled in UI for now.
 
 ## Playlist Management (Implemented)
 
@@ -30,6 +32,21 @@ Owner-only transfer workflows are available under `/api/v1/votuna/playlists/{pla
   - Optional destination playlist creation on export
   - Best-effort add with per-track fallback on chunk failure
   - Returns added/skipped/failed summary
+
+## Recommendations (Implemented)
+
+Recommendation workflows are available under `/api/v1/votuna/playlists/{playlist_id}/tracks/recommendations*`:
+
+- `GET /tracks/recommendations`
+  - Pulls related tracks from provider APIs using playlist tracks as seeds
+  - Applies dedupe, per-artist caps, declined-track filtering, and offset/limit paging
+  - Uses in-memory cache + in-flight request coalescing to reduce repeated provider calls
+- `POST /tracks/recommendations/decline`
+  - Stores user-level declines so rejected recommendations stay filtered
+
+Current provider behavior:
+- Enabled: SoundCloud, TIDAL
+- Returns empty list by design: Spotify, Apple Music
 
 ## Project Layout
 
@@ -72,14 +89,23 @@ Required values:
 
 - `DATABASE_URL`
 - `AUTH_SECRET_KEY`
-- One provider OAuth set (or both):
+- At least one provider OAuth set:
   - `SPOTIFY_CLIENT_ID`
   - `SPOTIFY_CLIENT_SECRET`
   - `SPOTIFY_REDIRECT_URI`
-  - Optional overrides: `SPOTIFY_API_BASE_URL`, `SPOTIFY_TOKEN_URL`
   - `SOUNDCLOUD_CLIENT_ID`
   - `SOUNDCLOUD_CLIENT_SECRET`
   - `SOUNDCLOUD_REDIRECT_URI`
+  - `TIDAL_CLIENT_ID`
+  - `TIDAL_CLIENT_SECRET`
+  - `TIDAL_REDIRECT_URI`
+- Optional overrides/settings:
+  - `SPOTIFY_API_BASE_URL`, `SPOTIFY_TOKEN_URL`
+  - `SOUNDCLOUD_API_BASE_URL`, `SOUNDCLOUD_TOKEN_URL`
+  - `TIDAL_API_BASE_URL`, `TIDAL_TOKEN_URL`, `TIDAL_COUNTRY_CODE`
+  - `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`, `APPLE_REDIRECT_URI`
+  - `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_PRIVATE_KEY`
+  - `APPLE_MUSIC_DEVELOPER_TOKEN`, `APPLE_MUSIC_STOREFRONT`
 
 ### 3. Run migrations
 

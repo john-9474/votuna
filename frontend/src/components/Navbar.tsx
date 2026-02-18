@@ -55,6 +55,18 @@ export default function Navbar() {
     window.location.href = `${API_URL}/api/v1/auth/login/spotify?next=${encodeURIComponent(next)}`
   }
 
+  /** Start the Apple Music OAuth flow. */
+  const handleAppleLogin = () => {
+    const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    window.location.href = `${API_URL}/api/v1/auth/login/apple?next=${encodeURIComponent(next)}`
+  }
+
+  /** Start the TIDAL OAuth flow. */
+  const handleTidalLogin = () => {
+    const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    window.location.href = `${API_URL}/api/v1/auth/login/tidal?next=${encodeURIComponent(next)}`
+  }
+
   /** Clear the auth cookie and local session state. */
   const handleLogout = async () => {
     try {
@@ -129,6 +141,8 @@ export default function Navbar() {
         onClose={() => setLoginOpen(false)}
         onSpotifyLogin={handleSpotifyLogin}
         onSoundcloudLogin={handleSoundcloudLogin}
+        onAppleLogin={handleAppleLogin}
+        onTidalLogin={handleTidalLogin}
       />
     </nav>
   )

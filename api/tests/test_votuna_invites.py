@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 import uuid
 
+import pytest
+
 from app.auth.dependencies import get_current_user
 from app.crud.user import user_crud
 from app.crud.votuna_playlist_invite import votuna_playlist_invite_crud
@@ -278,6 +280,25 @@ def test_candidates_provider_fallback_spotify_profile_url(auth_client, db_sessio
     assert data[0]["profile_url"] == "https://open.spotify.com/user/spotify-user-22"
 
 
+def test_candidates_apple_provider_returns_empty_without_provider_lookup(
+    auth_client,
+    db_session,
+    votuna_playlist,
+    provider_stub,
+):
+    votuna_playlist.provider = "apple"
+    db_session.add(votuna_playlist)
+    db_session.commit()
+
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites/candidates",
+        params={"q": "apple-user", "limit": 10},
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+    assert provider_stub.search_users_calls == 0
+
+
 def test_create_user_invite_unknown_provider_user_rejects(auth_client, votuna_playlist, provider_stub):
     response = auth_client.post(
         f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites",
@@ -285,6 +306,25 @@ def test_create_user_invite_unknown_provider_user_rejects(auth_client, votuna_pl
     )
     assert response.status_code == 400
     assert "not found" in response.json()["detail"].lower()
+
+
+def test_create_user_invite_apple_provider_rejects_targeted_invites(
+    auth_client,
+    db_session,
+    votuna_playlist,
+    provider_stub,
+):
+    votuna_playlist.provider = "apple"
+    db_session.add(votuna_playlist)
+    db_session.commit()
+
+    response = auth_client.post(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/invites",
+        json={"kind": "user", "target_provider_user_id": "provider-user-2"},
+    )
+    assert response.status_code == 400
+    assert "not supported" in response.json()["detail"].lower()
+    assert provider_stub.get_user_calls == 0
 
 
 def test_create_user_invite_success_unregistered(auth_client, votuna_playlist, provider_stub):
@@ -602,6 +642,37 @@ def test_open_invite_redirects_to_spotify_login_when_playlist_provider_is_spotif
     assert response.status_code in {302, 307}
     location = response.headers["location"]
     assert "/api/v1/auth/login/spotify" in location
+    assert "invite_token=" in location
+
+
+@pytest.mark.parametrize("provider", ["apple", "tidal"])
+def test_open_invite_redirects_to_provider_login_when_supported(
+    client,
+    db_session,
+    votuna_playlist,
+    provider,
+):
+    votuna_playlist.provider = provider
+    db_session.add(votuna_playlist)
+    db_session.commit()
+
+    invite = votuna_playlist_invite_crud.create(
+        db_session,
+        {
+            "playlist_id": votuna_playlist.id,
+            "invite_type": "link",
+            "token": f"invite-token-{uuid.uuid4().hex}",
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=1),
+            "max_uses": 1,
+            "uses_count": 0,
+            "is_revoked": False,
+            "created_by_user_id": votuna_playlist.owner_user_id,
+        },
+    )
+    response = client.get(f"/api/v1/votuna/invites/{invite.token}/open", follow_redirects=False)
+    assert response.status_code in {302, 307}
+    location = response.headers["location"]
+    assert f"/api/v1/auth/login/{provider}" in location
     assert "invite_token=" in location
 
 

@@ -101,6 +101,8 @@ export function usePlaylistDetailPage(
   const canEditSettings = useMemo(() => {
     return Boolean(playlist && currentUser?.id && playlist.owner_user_id === currentUser.id)
   }, [playlist, currentUser])
+  const normalizedProvider = (playlist?.provider ?? '').trim().toLowerCase()
+  const canRemoveTracks = canEditSettings && normalizedProvider !== 'apple'
 
   const collaboratorCount = useMemo(() => {
     if (!playlist) return 0
@@ -136,6 +138,7 @@ export function usePlaylistDetailPage(
     playlistId,
     queryClient,
     isCollaborative,
+    provider: playlist?.provider,
   })
 
   const playerState = usePlaylistPlayer()
@@ -151,6 +154,7 @@ export function usePlaylistDetailPage(
   const inviteState = usePlaylistInvites({
     playlistId,
     canInvite: canEditSettings && isSettingsTabActive,
+    provider: playlist?.provider,
     queryClient,
   })
 
@@ -173,6 +177,7 @@ export function usePlaylistDetailPage(
     members,
     isMembersLoading: membersQuery.isLoading,
     canEditSettings,
+    canRemoveTracks,
     collaboratorCount,
     isCollaborative,
     playlistType,

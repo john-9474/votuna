@@ -1,4 +1,5 @@
 from fastapi.responses import RedirectResponse
+import pytest
 
 from app.config.settings import settings
 from app.crud.user import user_crud
@@ -56,20 +57,12 @@ class DummyNumericSSO(DummySSO):
         return DummyNumericOpenID()
 
 
-def test_login_redirect(client, monkeypatch):
+@pytest.mark.parametrize("provider", ["soundcloud", "spotify", "apple", "tidal"])
+def test_login_redirect(client, monkeypatch, provider):
     import app.api.v1.routes.auth as auth_routes
 
     monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
-    response = client.get("/api/v1/auth/login/soundcloud", follow_redirects=False)
-    assert response.status_code in {302, 307}
-    assert response.headers["location"] == "https://example.com/login"
-
-
-def test_login_redirect_spotify(client, monkeypatch):
-    import app.api.v1.routes.auth as auth_routes
-
-    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
-    response = client.get("/api/v1/auth/login/spotify", follow_redirects=False)
+    response = client.get(f"/api/v1/auth/login/{provider}", follow_redirects=False)
     assert response.status_code in {302, 307}
     assert response.headers["location"] == "https://example.com/login"
 
@@ -102,15 +95,16 @@ def test_callback_creates_user_and_sets_cookie(client, db_session, monkeypatch):
     assert user.email == "user@example.com"
 
 
-def test_callback_creates_spotify_user_and_sets_cookie(client, db_session, monkeypatch):
+@pytest.mark.parametrize("provider", ["spotify", "apple", "tidal"])
+def test_callback_creates_provider_user_and_sets_cookie(client, db_session, monkeypatch, provider):
     import app.api.v1.routes.auth as auth_routes
 
     monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
-    response = client.get("/api/v1/auth/callback/spotify", follow_redirects=False)
+    response = client.get(f"/api/v1/auth/callback/{provider}", follow_redirects=False)
     assert response.status_code in {302, 307}
     assert settings.AUTH_COOKIE_NAME in response.headers.get("set-cookie", "")
 
-    user = user_crud.get_by_provider_id(db_session, "spotify", "sc-user")
+    user = user_crud.get_by_provider_id(db_session, provider, "sc-user")
     assert user is not None
     assert user.email == "user@example.com"
 

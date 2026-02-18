@@ -9,6 +9,8 @@ type LoginProviderDialogProps = {
   onClose: () => void
   onSpotifyLogin: () => void
   onSoundcloudLogin: () => void
+  onAppleLogin: () => void
+  onTidalLogin: () => void
 }
 
 export default function LoginProviderDialog({
@@ -16,6 +18,8 @@ export default function LoginProviderDialog({
   onClose,
   onSpotifyLogin,
   onSoundcloudLogin,
+  onAppleLogin,
+  onTidalLogin,
 }: LoginProviderDialogProps) {
   return (
     <Dialog open={open} onClose={onClose}>
@@ -46,6 +50,18 @@ export default function LoginProviderDialog({
             className="w-full justify-center rounded-2xl"
           >
             Continue with SoundCloud
+          </AppButton>
+          <AppButton
+            intent="secondary"
+            onClick={onAppleLogin}
+            disabled
+            className="w-full justify-center rounded-2xl"
+            title="Apple Music login is temporarily disabled"
+          >
+            Continue with Apple Music (Temporarily disabled)
+          </AppButton>
+          <AppButton intent="secondary" onClick={onTidalLogin} className="w-full justify-center rounded-2xl">
+            Continue with TIDAL
           </AppButton>
         </div>
       </DialogPanel>

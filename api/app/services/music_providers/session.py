@@ -194,6 +194,76 @@ async def refresh_spotify_access_token(user: User, db: Session | None = None) ->
     return next_access_token
 
 
+async def refresh_tidal_access_token(user: User, db: Session | None = None) -> str | None:
+    """Refresh the TIDAL access token for a user when possible."""
+    refresh_token = (user.refresh_token or "").strip()
+    if not refresh_token:
+        return None
+    if not settings.TIDAL_CLIENT_ID or not settings.TIDAL_CLIENT_SECRET:
+        logger.warning("Skipping TIDAL token refresh because client credentials are missing")
+        return None
+
+    payload = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": settings.TIDAL_CLIENT_ID,
+        "client_secret": settings.TIDAL_CLIENT_SECRET,
+    }
+    headers = {
+        "Accept": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=TOKEN_REFRESH_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                settings.TIDAL_TOKEN_URL,
+                data=payload,
+                headers=headers,
+            )
+    except Exception:
+        logger.exception("TIDAL token refresh request failed")
+        return None
+
+    if not response.is_success:
+        logger.warning(
+            "TIDAL token refresh failed with status %s",
+            response.status_code,
+        )
+        return None
+
+    try:
+        token_payload = response.json() if response.content else {}
+    except ValueError:
+        logger.warning("TIDAL token refresh returned invalid JSON")
+        return None
+    if not isinstance(token_payload, dict):
+        logger.warning("TIDAL token refresh returned non-JSON payload")
+        return None
+
+    next_access_token_raw = token_payload.get("access_token")
+    if not isinstance(next_access_token_raw, str) or not next_access_token_raw.strip():
+        logger.warning("TIDAL token refresh response did not include an access token")
+        return None
+    next_access_token = next_access_token_raw.strip()
+
+    next_refresh_token_raw = token_payload.get("refresh_token")
+    next_refresh_token = (
+        next_refresh_token_raw.strip()
+        if isinstance(next_refresh_token_raw, str) and next_refresh_token_raw.strip()
+        else refresh_token
+    )
+
+    token_expires_at = expires_at_from_payload(token_payload)
+
+    _persist_refreshed_tokens(
+        user=user,
+        access_token=next_access_token,
+        refresh_token=next_refresh_token,
+        token_expires_at=token_expires_at,
+        db=db,
+    )
+    return next_access_token
+
+
 class ProviderClientWithRefresh:
     """Thin proxy that refreshes provider tokens once on auth failures."""
 
@@ -216,6 +286,8 @@ class ProviderClientWithRefresh:
             next_access_token = await refresh_soundcloud_access_token(self._user, self._db)
         elif self._provider == "spotify":
             next_access_token = await refresh_spotify_access_token(self._user, self._db)
+        elif self._provider == "tidal":
+            next_access_token = await refresh_tidal_access_token(self._user, self._db)
         else:
             return False
         if not next_access_token:

@@ -6,14 +6,18 @@ import { queryKeys } from '@/lib/constants/queryKeys'
 import type { InviteCandidate, PlaylistInvite } from '@/lib/types/votuna'
 
 const DEFAULT_SEARCH_LIMIT = 10
+const PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS = new Set(['apple', 'tidal'])
 
 type UsePlaylistInvitesArgs = {
   playlistId: string | undefined
   canInvite: boolean
+  provider: string | undefined
   queryClient: QueryClient
 }
 
-export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePlaylistInvitesArgs) {
+export function usePlaylistInvites({ playlistId, canInvite, provider, queryClient }: UsePlaylistInvitesArgs) {
+  const normalizedProvider = provider?.trim().toLowerCase() ?? ''
+  const canSearchProviderUsers = !PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS.has(normalizedProvider)
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [hasSearched, setHasSearched] = useState(false)
@@ -181,6 +185,12 @@ export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePl
 
   const searchCandidates = () => {
     if (!playlistId || !canInvite) return
+    if (!canSearchProviderUsers) {
+      setHasSearched(true)
+      setSearchResults([])
+      setSearchError('Search by provider user is unavailable for this provider. Share an invite link instead.')
+      return
+    }
     const trimmed = searchQuery.trim()
     if (!trimmed) {
       setHasSearched(true)
@@ -195,6 +205,7 @@ export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePl
 
   return {
     canInvite,
+    canSearchProviderUsers,
     pendingUserInvites,
     isPendingInvitesLoading: invitesQuery.isLoading,
     modal: {
@@ -219,7 +230,9 @@ export function usePlaylistInvites({ playlistId, canInvite, queryClient }: UsePl
       isCancelling: cancelInviteMutation.isPending,
       cancellingInviteId,
       sendToCandidate: (candidate: InviteCandidate) =>
-        createUserInviteMutation.mutate(candidate.provider_user_id),
+        canSearchProviderUsers
+          ? createUserInviteMutation.mutate(candidate.provider_user_id)
+          : setInviteError('Targeted user invites are unavailable for this provider.'),
       cancelPendingInvite: (inviteId: number) => cancelInviteMutation.mutate(inviteId),
     },
     link: {

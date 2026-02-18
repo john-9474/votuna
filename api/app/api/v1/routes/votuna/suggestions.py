@@ -1,7 +1,10 @@
 """Votuna suggestion routes."""
 
+import asyncio
 import hashlib
+import time
 from datetime import datetime, timezone
+from typing import Any, Callable, Coroutine, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -41,9 +44,16 @@ router = APIRouter()
 
 REJECTED_TRACK_ERROR_CODE = "TRACK_PREVIOUSLY_REJECTED"
 PERSONAL_SUGGESTIONS_ERROR_CODE = "PERSONAL_PLAYLIST_SUGGESTIONS_DISABLED"
-RECOMMENDATION_SEED_LIMIT = 8
-RECOMMENDATION_RELATED_LIMIT_PER_SEED = 25
+RECOMMENDATION_SEED_LIMIT = 4
+RECOMMENDATION_RELATED_LIMIT_PER_SEED = 12
 RECOMMENDATION_MAX_TRACKS_PER_ARTIST = 2
+RECOMMENDATION_RESULT_BUFFER = 8
+RECOMMENDATION_CACHE_TTL_SECONDS = 30.0
+RECOMMENDATIONS_DISABLED_PROVIDERS = {"spotify", "apple"}
+
+_recommendation_cache_lock = asyncio.Lock()
+_recommendation_cache: dict[str, tuple[float, list[ProviderTrackOut]]] = {}
+_recommendation_inflight: dict[str, asyncio.Task[list[ProviderTrackOut]]] = {}
 
 
 def _display_name(user: User) -> str:
@@ -100,6 +110,81 @@ def _serialize_provider_track(track: ProviderTrack) -> ProviderTrackOut:
         artwork_url=track.artwork_url,
         url=track.url,
     )
+
+
+def _recommendation_cache_key(
+    *,
+    playlist_id: int,
+    user_id: int,
+    provider: str,
+    limit: int,
+    offset: int,
+    refresh_nonce: str | None,
+) -> str:
+    nonce = (refresh_nonce or "").strip()
+    return f"{playlist_id}:{user_id}:{provider}:{limit}:{offset}:{nonce}"
+
+
+def _prune_recommendation_cache(now: float) -> None:
+    expired_keys = [key for key, (expires_at, _payload) in _recommendation_cache.items() if expires_at <= now]
+    for key in expired_keys:
+        _recommendation_cache.pop(key, None)
+
+
+async def _run_recommendation_cached(
+    cache_key: str,
+    operation: Callable[[], Coroutine[Any, Any, list[ProviderTrackOut]]],
+) -> list[ProviderTrackOut]:
+    now = time.monotonic()
+    cached_entry = _recommendation_cache.get(cache_key)
+    if cached_entry and cached_entry[0] > now:
+        return [item.model_copy(deep=True) for item in cached_entry[1]]
+
+    created_task = False
+    async with _recommendation_cache_lock:
+        now = time.monotonic()
+        _prune_recommendation_cache(now)
+        cached_entry = _recommendation_cache.get(cache_key)
+        if cached_entry and cached_entry[0] > now:
+            return [item.model_copy(deep=True) for item in cached_entry[1]]
+        task = _recommendation_inflight.get(cache_key)
+        if task is None:
+            task = asyncio.create_task(operation())
+            _recommendation_inflight[cache_key] = task
+            created_task = True
+
+    try:
+        payload = await task
+    except Exception:
+        if created_task:
+            async with _recommendation_cache_lock:
+                if _recommendation_inflight.get(cache_key) is task:
+                    _recommendation_inflight.pop(cache_key, None)
+        raise
+
+    if created_task:
+        async with _recommendation_cache_lock:
+            if _recommendation_inflight.get(cache_key) is task:
+                _recommendation_inflight.pop(cache_key, None)
+            _recommendation_cache[cache_key] = (
+                time.monotonic() + RECOMMENDATION_CACHE_TTL_SECONDS,
+                [item.model_copy(deep=True) for item in payload],
+            )
+
+    return [item.model_copy(deep=True) for item in payload]
+
+
+async def _invalidate_recommendation_cache_for_playlist(playlist_id: int) -> None:
+    prefix = f"{playlist_id}:"
+    async with _recommendation_cache_lock:
+        keys_to_remove = [key for key in _recommendation_cache if key.startswith(prefix)]
+        for key in keys_to_remove:
+            _recommendation_cache.pop(key, None)
+        inflight_keys = [key for key in _recommendation_inflight if key.startswith(prefix)]
+        for key in inflight_keys:
+            task = _recommendation_inflight.pop(key, None)
+            if task and not task.done():
+                task.cancel()
 
 
 def _serialize_suggestion(
@@ -205,6 +290,7 @@ async def _accept_suggestion(
             "suggestion_id": suggestion.id,
         },
     )
+    await _invalidate_recommendation_cache_for_playlist(playlist.id)
     return accepted
 
 
@@ -288,6 +374,7 @@ async def search_tracks_for_suggestions(
     playlist_id: int,
     q: str = Query(..., min_length=1),
     limit: int = Query(10, ge=1, le=25),
+    hydrate: bool = Query(True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -299,7 +386,10 @@ async def search_tracks_for_suggestions(
     if not query:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Search query is required")
     try:
-        results = await client.search_tracks(query, limit=limit)
+        if playlist.provider == "tidal":
+            results = await cast(Any, client).search_tracks(query, limit=limit, hydrate_metadata=hydrate)
+        else:
+            results = await client.search_tracks(query, limit=limit)
     except ProviderAuthError:
         raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
     except ProviderAPIError as exc:
@@ -329,112 +419,143 @@ async def list_recommended_tracks(
     """List personalized track recommendations based on current playlist tracks."""
     playlist = get_playlist_or_404(db, playlist_id)
     require_member(db, playlist_id, current_user.id)
-    if playlist.provider == "spotify":
-        # Spotify recommendations endpoint is deprecated. Keep this stable until phase 2.
+    if playlist.provider in RECOMMENDATIONS_DISABLED_PROVIDERS:
+        # Keep this endpoint stable for providers where recommendations are unavailable.
         return []
-    client = get_owner_client(db, playlist)
-    try:
-        current_tracks = list(await client.list_tracks(playlist.provider_playlist_id))
-    except ProviderAuthError:
-        raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
-    except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
-
-    if not current_tracks:
-        return []
-
-    seed_track_ids = _ordered_seed_track_ids(current_tracks, refresh_nonce)
-    if not seed_track_ids:
-        return []
-
-    existing_track_ids = {
-        (track.provider_track_id or "").strip() for track in current_tracks if (track.provider_track_id or "").strip()
-    }
-    pending_track_ids = {
-        suggestion.provider_track_id
-        for suggestion in votuna_track_suggestion_crud.list_for_playlist(
-            db,
-            playlist_id,
-            status="pending",
-        )
-    }
-    declined_track_ids = votuna_track_recommendation_decline_crud.list_declined_track_ids(
-        db,
-        playlist_id=playlist_id,
+    safe_limit = max(1, min(limit, 50))
+    safe_offset = max(0, offset)
+    cache_key = _recommendation_cache_key(
+        playlist_id=playlist.id,
         user_id=current_user.id,
+        provider=playlist.provider,
+        limit=safe_limit,
+        offset=safe_offset,
+        refresh_nonce=refresh_nonce,
     )
 
-    score_by_track_id: dict[str, tuple[int, int, ProviderTrack]] = {}
-    for seed_index, seed_track_id in enumerate(seed_track_ids):
+    async def _compute() -> list[ProviderTrackOut]:
+        client = get_owner_client(db, playlist)
         try:
-            related_tracks = await client.related_tracks(
-                seed_track_id,
-                limit=RECOMMENDATION_RELATED_LIMIT_PER_SEED,
-                offset=0,
-            )
+            current_tracks = list(await client.list_tracks(playlist.provider_playlist_id))
         except ProviderAuthError:
             raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
         except ProviderAPIError as exc:
-            if exc.status_code in {400, 404}:
-                continue
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
-        for track in related_tracks:
+        if not current_tracks:
+            return []
+
+        seed_track_ids = _ordered_seed_track_ids(current_tracks, refresh_nonce)
+        if not seed_track_ids:
+            return []
+
+        existing_track_ids = {
+            (track.provider_track_id or "").strip()
+            for track in current_tracks
+            if (track.provider_track_id or "").strip()
+        }
+        pending_track_ids = {
+            suggestion.provider_track_id
+            for suggestion in votuna_track_suggestion_crud.list_for_playlist(
+                db,
+                playlist_id,
+                status="pending",
+            )
+        }
+        declined_track_ids = votuna_track_recommendation_decline_crud.list_declined_track_ids(
+            db,
+            playlist_id=playlist_id,
+            user_id=current_user.id,
+        )
+
+        target_candidate_count = safe_offset + safe_limit + RECOMMENDATION_RESULT_BUFFER
+        score_by_track_id: dict[str, tuple[int, int, ProviderTrack]] = {}
+        for seed_index, seed_track_id in enumerate(seed_track_ids):
+            try:
+                related_tracks = await client.related_tracks(
+                    seed_track_id,
+                    limit=RECOMMENDATION_RELATED_LIMIT_PER_SEED,
+                    offset=0,
+                )
+            except ProviderAuthError:
+                raise_provider_auth(current_user, owner_id=playlist.owner_user_id, provider=playlist.provider)
+            except ProviderAPIError as exc:
+                if exc.status_code in {400, 404}:
+                    continue
+                raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+            for track in related_tracks:
+                track_id = (track.provider_track_id or "").strip()
+                if not track_id:
+                    continue
+                existing_entry = score_by_track_id.get(track_id)
+                if not existing_entry:
+                    score_by_track_id[track_id] = (1, seed_index, track)
+                    continue
+                score, first_seed_index, existing_track = existing_entry
+                next_first_seed_index = min(seed_index, first_seed_index)
+                score_by_track_id[track_id] = (score + 1, next_first_seed_index, existing_track)
+
+            eligible_candidate_count = 0
+            for related_track_id in score_by_track_id:
+                if related_track_id in existing_track_ids:
+                    continue
+                if related_track_id in pending_track_ids:
+                    continue
+                if related_track_id in declined_track_ids:
+                    continue
+                eligible_candidate_count += 1
+            if eligible_candidate_count >= target_candidate_count:
+                break
+
+        if not score_by_track_id:
+            return []
+
+        ranked_entries = sorted(
+            score_by_track_id.items(),
+            key=lambda entry: (
+                -entry[1][0],
+                entry[1][1],
+                entry[0],
+            ),
+        )
+
+        filtered_tracks: list[ProviderTrack] = []
+        artist_counts: dict[str, int] = {}
+        for _track_id, (_score, _first_seed_index, track) in ranked_entries:
             track_id = (track.provider_track_id or "").strip()
             if not track_id:
                 continue
-            existing_entry = score_by_track_id.get(track_id)
-            if not existing_entry:
-                score_by_track_id[track_id] = (1, seed_index, track)
+            if track_id in existing_track_ids:
                 continue
-            score, first_seed_index, existing_track = existing_entry
-            next_first_seed_index = min(seed_index, first_seed_index)
-            score_by_track_id[track_id] = (score + 1, next_first_seed_index, existing_track)
-
-    if not score_by_track_id:
-        return []
-
-    ranked_entries = sorted(
-        score_by_track_id.items(),
-        key=lambda entry: (
-            -entry[1][0],
-            entry[1][1],
-            entry[0],
-        ),
-    )
-
-    filtered_tracks: list[ProviderTrack] = []
-    artist_counts: dict[str, int] = {}
-    for _track_id, (_score, _first_seed_index, track) in ranked_entries:
-        track_id = (track.provider_track_id or "").strip()
-        if not track_id:
-            continue
-        if track_id in existing_track_ids:
-            continue
-        if track_id in pending_track_ids:
-            continue
-        if track_id in declined_track_ids:
-            continue
-        artist_key = (track.artist or "").strip().lower()
-        if artist_key:
-            current_count = artist_counts.get(artist_key, 0)
-            if current_count >= RECOMMENDATION_MAX_TRACKS_PER_ARTIST:
+            if track_id in pending_track_ids:
                 continue
-            artist_counts[artist_key] = current_count + 1
-        filtered_tracks.append(track)
+            if track_id in declined_track_ids:
+                continue
+            artist_key = (track.artist or "").strip().lower()
+            if artist_key:
+                current_count = artist_counts.get(artist_key, 0)
+                if current_count >= RECOMMENDATION_MAX_TRACKS_PER_ARTIST:
+                    continue
+                artist_counts[artist_key] = current_count + 1
+            filtered_tracks.append(track)
+            if len(filtered_tracks) >= target_candidate_count:
+                break
 
-    if not filtered_tracks:
-        return []
+        if not filtered_tracks:
+            return []
 
-    page = filtered_tracks[offset : offset + limit]
-    return [_serialize_provider_track(track) for track in page]
+        page = filtered_tracks[safe_offset : safe_offset + safe_limit]
+        return [_serialize_provider_track(track) for track in page]
+
+    return await _run_recommendation_cached(cache_key, _compute)
 
 
 @router.post(
     "/playlists/{playlist_id}/tracks/recommendations/decline",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-def decline_track_recommendation(
+async def decline_track_recommendation(
     playlist_id: int,
     payload: VotunaTrackRecommendationDeclineCreate,
     db: Session = Depends(get_db),
@@ -454,6 +575,7 @@ def decline_track_recommendation(
         provider_track_id=provider_track_id,
         declined_at=datetime.now(timezone.utc),
     )
+    await _invalidate_recommendation_cache_for_playlist(playlist.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

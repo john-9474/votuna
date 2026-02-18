@@ -1,5 +1,5 @@
 import { useMutation, type QueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { apiFetch, apiJson, type ApiError } from '@/lib/api'
 import { queryKeys } from '@/lib/constants/queryKeys'
@@ -9,6 +9,7 @@ type UsePlaylistInteractionsArgs = {
   playlistId: string | undefined
   queryClient: QueryClient
   isCollaborative: boolean
+  provider: string | undefined
 }
 
 type SuggestPayload = {
@@ -27,9 +28,10 @@ type RecommendationFetchOptions = {
 }
 
 const REJECTED_TRACK_ERROR_CODE = 'TRACK_PREVIOUSLY_REJECTED'
-const RECOMMENDATIONS_BATCH_SIZE = 25
+const RECOMMENDATIONS_BATCH_SIZE = 12
 const VISIBLE_RECOMMENDATIONS_COUNT = 5
-const RECOMMENDATIONS_QUEUE_PREFETCH_THRESHOLD = 5
+const RECOMMENDATIONS_QUEUE_PREFETCH_THRESHOLD = 3
+const RECOMMENDATIONS_DISABLED_PROVIDERS = new Set(['spotify', 'apple'])
 
 function createRefreshNonce(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -51,7 +53,10 @@ export function usePlaylistInteractions({
   playlistId,
   queryClient,
   isCollaborative,
+  provider,
 }: UsePlaylistInteractionsArgs) {
+  const normalizedProvider = provider?.trim().toLowerCase() ?? ''
+  const isRecommendationsSupported = !RECOMMENDATIONS_DISABLED_PROVIDERS.has(normalizedProvider)
   const [suggestStatus, setSuggestStatus] = useState('')
   const [suggestionsActionStatus, setSuggestionsActionStatus] = useState('')
   const [trackActionStatus, setTrackActionStatus] = useState('')
@@ -60,6 +65,7 @@ export function usePlaylistInteractions({
   const [suggestedSearchTrackIds, setSuggestedSearchTrackIds] = useState<string[]>([])
   const [searchStatus, setSearchStatus] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [isSearchHydrating, setIsSearchHydrating] = useState(false)
   const [linkSuggestionUrl, setLinkSuggestionUrl] = useState('')
   const [removingTrackId, setRemovingTrackId] = useState<string | null>(null)
   const [recommendedTracks, setRecommendedTracks] = useState<ProviderTrack[]>([])
@@ -70,6 +76,7 @@ export function usePlaylistInteractions({
   const [recommendationsOffset, setRecommendationsOffset] = useState(0)
   const [hasMoreRecommendations, setHasMoreRecommendations] = useState(false)
   const [recommendationsRefreshNonce, setRecommendationsRefreshNonce] = useState(createRefreshNonce())
+  const latestSearchRequestIdRef = useRef(0)
 
   useEffect(() => {
     if (isCollaborative) return
@@ -138,7 +145,7 @@ export function usePlaylistInteractions({
     nonce,
     pageSize,
   }: RecommendationFetchOptions) => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     if (!reset && (!hasMoreRecommendations || isRecommendationsLoading)) return
     const requestLimit = pageSize ?? RECOMMENDATIONS_BATCH_SIZE
     const requestOffset = reset ? 0 : recommendationsOffset
@@ -168,7 +175,7 @@ export function usePlaylistInteractions({
   }
 
   const loadInitialRecommendations = () => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     void fetchRecommendations({
       reset: true,
       nonce: recommendationsRefreshNonce,
@@ -176,7 +183,7 @@ export function usePlaylistInteractions({
   }
 
   const refreshRecommendations = () => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     const nextNonce = createRefreshNonce()
     setRecommendationsRefreshNonce(nextNonce)
     setRecommendationsOffset(0)
@@ -185,7 +192,7 @@ export function usePlaylistInteractions({
   }
 
   const loadMoreRecommendations = () => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     void fetchRecommendations({
       reset: false,
       nonce: recommendationsRefreshNonce,
@@ -193,12 +200,13 @@ export function usePlaylistInteractions({
   }
 
   useEffect(() => {
-    if (!playlistId) {
+    if (!playlistId || !isRecommendationsSupported) {
       setRecommendedTracks([])
       setRecommendationQueue([])
       setRecommendationsStatus('')
       setRecommendationsOffset(0)
       setHasMoreRecommendations(false)
+      setIsRecommendationsLoading(false)
       return
     }
     const nonce = createRefreshNonce()
@@ -207,7 +215,7 @@ export function usePlaylistInteractions({
     setHasMoreRecommendations(true)
     void fetchRecommendations({ reset: true, nonce })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playlistId])
+  }, [playlistId, isRecommendationsSupported])
 
   const suggestMutation = useMutation({
     mutationFn: async (payload: SuggestPayload) => {
@@ -341,23 +349,74 @@ export function usePlaylistInteractions({
 
   const searchTracks = async () => {
     if (!playlistId || !searchQuery.trim()) return
+    const query = searchQuery.trim()
+    const requestId = latestSearchRequestIdRef.current + 1
+    latestSearchRequestIdRef.current = requestId
     setSearchStatus('')
     setIsSearching(true)
+    setIsSearchHydrating(false)
+    let initialResults: ProviderTrack[] = []
     try {
+      const baseSearchUrl = `/api/v1/votuna/playlists/${playlistId}/tracks/search?q=${encodeURIComponent(query)}&limit=8`
+      const searchUrl =
+        normalizedProvider === 'tidal'
+          ? `${baseSearchUrl}&hydrate=false`
+          : baseSearchUrl
       const results = await apiJson<ProviderTrack[]>(
-        `/api/v1/votuna/playlists/${playlistId}/tracks/search?q=${encodeURIComponent(searchQuery.trim())}&limit=8`,
+        searchUrl,
         { authRequired: true },
       )
+      if (requestId !== latestSearchRequestIdRef.current) return
+      initialResults = results
       setSearchResults(results)
       if (results.length === 0) {
         setSearchStatus('No tracks found for that search.')
       }
     } catch (error) {
+      if (requestId !== latestSearchRequestIdRef.current) return
       const message = error instanceof Error ? error.message : 'Unable to search tracks'
       setSearchStatus(message)
       setSearchResults([])
     } finally {
-      setIsSearching(false)
+      if (requestId === latestSearchRequestIdRef.current) {
+        setIsSearching(false)
+      }
+    }
+
+    if (normalizedProvider !== 'tidal') return
+    if (requestId !== latestSearchRequestIdRef.current) return
+    if (initialResults.length === 0) return
+    const needsHydration = initialResults.some((track) => !track.artist || !track.artwork_url)
+    if (!needsHydration) return
+    setIsSearchHydrating(true)
+
+    try {
+      const hydratedResults = await apiJson<ProviderTrack[]>(
+        `/api/v1/votuna/playlists/${playlistId}/tracks/search?q=${encodeURIComponent(query)}&limit=8&hydrate=true`,
+        { authRequired: true },
+      )
+      if (requestId !== latestSearchRequestIdRef.current) return
+      const hydratedById = new Map(hydratedResults.map((track) => [track.provider_track_id, track]))
+      setSearchResults((current) =>
+        current.map((track) => {
+          const hydrated = hydratedById.get(track.provider_track_id)
+          if (!hydrated) return track
+          return {
+            ...track,
+            title: hydrated.title || track.title,
+            artist: hydrated.artist ?? track.artist,
+            genre: hydrated.genre ?? track.genre,
+            artwork_url: hydrated.artwork_url ?? track.artwork_url,
+            url: hydrated.url ?? track.url,
+          }
+        }),
+      )
+    } catch {
+      // Keep fast results visible when background hydration fails.
+    } finally {
+      if (requestId === latestSearchRequestIdRef.current) {
+        setIsSearchHydrating(false)
+      }
     }
   }
 
@@ -455,7 +514,7 @@ export function usePlaylistInteractions({
   }
 
   const acceptRecommendation = async (track: ProviderTrack) => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     setRecommendationsStatus('')
     setIsRecommendationActionPending(true)
     try {
@@ -492,7 +551,7 @@ export function usePlaylistInteractions({
   }
 
   const declineRecommendation = async (track: ProviderTrack) => {
-    if (!playlistId) return
+    if (!playlistId || !isRecommendationsSupported) return
     const previousRecommendations = recommendedTracks
     const previousQueue = recommendationQueue
     const nextRecommendations = previousRecommendations.filter(
@@ -546,6 +605,7 @@ export function usePlaylistInteractions({
     if (value.trim()) return
     setSearchResults([])
     setSearchStatus('')
+    setIsSearchHydrating(false)
   }
 
   const setReaction = (suggestionId: number, reaction: 'up' | 'down') => {
@@ -572,6 +632,7 @@ export function usePlaylistInteractions({
     setSearchQuery,
     searchTracks,
     isSearching,
+    isSearchHydrating,
     searchStatus,
     searchResults,
     suggestedSearchTrackIds,
@@ -593,6 +654,7 @@ export function usePlaylistInteractions({
     removingTrackId,
     trackActionStatus,
     recommendedTracks,
+    isRecommendationsSupported,
     recommendationsStatus,
     isRecommendationsLoading,
     isRecommendationActionPending,

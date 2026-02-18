@@ -8,10 +8,17 @@ from enum import Enum
 from typing import Any, Mapping, Protocol, cast
 
 from fastapi import Request, Response
+from fastapi_sso.sso.apple import AppleSSO
 from fastapi_sso.sso.soundcloud import SoundcloudSSO
 from fastapi_sso.sso.spotify import SpotifySSO
+from fastapi_sso.sso.tidal import TidalSSO
 
 from app.config.settings import settings
+
+APPLE_SCOPES = [
+    "openid",
+    "email",
+]
 
 SPOTIFY_SCOPES = [
     "user-read-email",
@@ -24,6 +31,17 @@ SPOTIFY_SCOPES = [
 
 SOUNDCLOUD_SCOPES = [
     "non-expiring",
+]
+
+TIDAL_SCOPES = [
+    "user.read",
+    "search.read",
+    "playlists.read",
+    "playlists.write",
+    "entitlements.read",
+    "playback",
+    "recommendations.read",
+    "search.write",
 ]
 
 
@@ -79,8 +97,10 @@ class SSOProtocol(Protocol):
 
 
 class AuthProvider(str, Enum):
+    apple = "apple"
     spotify = "spotify"
     soundcloud = "soundcloud"
+    tidal = "tidal"
 
 
 @dataclass(frozen=True)
@@ -105,6 +125,20 @@ def _require_settings(provider: AuthProvider, client_id: str, client_secret: str
 
 def get_provider_config(provider: AuthProvider) -> ProviderConfig:
     """Return the provider configuration used to build the SSO client."""
+    if provider is AuthProvider.apple:
+        return ProviderConfig(
+            provider=provider,
+            sso_class=AppleSSO,
+            client_id=settings.APPLE_CLIENT_ID,
+            client_secret=settings.APPLE_CLIENT_SECRET,
+            redirect_uri=settings.APPLE_REDIRECT_URI,
+            scope=APPLE_SCOPES,
+            id_keys=("sub", "id"),
+            email_keys=("email",),
+            display_name_keys=("name", "display_name"),
+            avatar_keys=("picture", "avatar_url"),
+        )
+
     if provider is AuthProvider.spotify:
         return ProviderConfig(
             provider=provider,
@@ -130,6 +164,20 @@ def get_provider_config(provider: AuthProvider) -> ProviderConfig:
             id_keys=("id", "sub"),
             email_keys=("email",),
             display_name_keys=("username", "name", "display_name"),
+            avatar_keys=("avatar_url", "picture"),
+        )
+
+    if provider is AuthProvider.tidal:
+        return ProviderConfig(
+            provider=provider,
+            sso_class=TidalSSO,
+            client_id=settings.TIDAL_CLIENT_ID,
+            client_secret=settings.TIDAL_CLIENT_SECRET,
+            redirect_uri=settings.TIDAL_REDIRECT_URI,
+            scope=TIDAL_SCOPES,
+            id_keys=("id", "sub"),
+            email_keys=("email",),
+            display_name_keys=("display_name", "username", "name"),
             avatar_keys=("avatar_url", "picture"),
         )
 

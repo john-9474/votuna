@@ -183,6 +183,7 @@ export default function PlaylistDetailPage() {
               onSearchQueryChange={state.setSearchQuery}
               onSearchTracks={state.searchTracks}
               isSearching={state.isSearching}
+              isSearchHydrating={state.isSearchHydrating}
               searchStatus={state.searchStatus}
               searchResults={state.searchResults}
               optimisticSuggestedTrackIds={state.suggestedSearchTrackIds}
@@ -195,6 +196,7 @@ export default function PlaylistDetailPage() {
               onLinkSuggestionUrlChange={state.setLinkSuggestionUrl}
               onSuggestFromLink={state.suggestFromLink}
               suggestStatus={state.suggestStatus}
+              showRecommendations={state.isRecommendationsSupported}
               recommendedTracks={state.recommendedTracks}
               recommendationsStatus={state.recommendationsStatus}
               isRecommendationsLoading={state.isRecommendationsLoading}
@@ -225,7 +227,7 @@ export default function PlaylistDetailPage() {
               tracks={state.tracks}
               isLoading={state.isTracksLoading}
               onPlayTrack={state.playTrack}
-              canRemoveTracks={state.canEditSettings}
+              canRemoveTracks={state.canRemoveTracks}
               onRemoveTrack={state.removeTrack}
               isRemoveTrackPending={state.isRemoveTrackPending}
               removingTrackId={state.removingTrackId}

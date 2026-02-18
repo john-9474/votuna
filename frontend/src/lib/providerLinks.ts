@@ -57,5 +57,13 @@ export const getProviderPlaylistUrl = ({
     return `https://open.spotify.com/playlist/${encodeURIComponent(normalizedPlaylistId)}`
   }
 
+  if (normalizedProvider === 'tidal') {
+    return `https://listen.tidal.com/playlist/${encodeURIComponent(normalizedPlaylistId)}`
+  }
+
+  if (normalizedProvider === 'apple') {
+    return `https://music.apple.com/library/playlist/${encodeURIComponent(normalizedPlaylistId)}`
+  }
+
   return null
 }

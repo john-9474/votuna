@@ -41,6 +41,7 @@ router = APIRouter()
 
 DEFAULT_LINK_EXPIRES_HOURS = 24 * 7
 DEFAULT_LINK_MAX_USES = 1
+PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS = {"apple", "tidal"}
 
 
 def _build_invite_url(request: Request, token: str) -> str:
@@ -141,6 +142,9 @@ async def list_invite_candidates(
             if user.provider_user_id != current_user.provider_user_id
         ]
 
+    if playlist.provider in PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS:
+        return []
+
     client = get_owner_client(db, playlist)
     try:
         provider_users = await client.search_users(q, limit=limit)
@@ -201,11 +205,13 @@ async def list_playlist_invites(
     user_invites = [invite for invite in invites if invite.invite_type == "user" and invite.target_provider_user_id]
 
     if user_invites:
+        supports_provider_user_lookup = playlist.provider not in PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS
         client = None
-        try:
-            client = get_owner_client(db, playlist)
-        except HTTPException:
-            client = None
+        if supports_provider_user_lookup:
+            try:
+                client = get_owner_client(db, playlist)
+            except HTTPException:
+                client = None
 
         for invite in user_invites:
             handle = invite.target_username_snapshot or invite.target_provider_user_id
@@ -342,6 +348,11 @@ async def create_invite(
     playlist = require_owner(db, playlist_id, current_user.id)
 
     if isinstance(payload, VotunaPlaylistInviteCreateUser):
+        if playlist.provider in PROVIDER_USER_INVITES_UNSUPPORTED_PROVIDERS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Targeted user invites are not supported for this provider. Use an invite link instead.",
+            )
         target_provider_user_id = payload.target_provider_user_id.strip()
         if not target_provider_user_id:
             raise HTTPException(

@@ -44,10 +44,12 @@ const getProviderLabel = (provider: string | null | undefined) => {
 /** Landing page hero content. */
 function Landing() {
   const statusItems = [
-    'Spotify and SoundCloud login',
+    'Spotify, SoundCloud, and TIDAL login',
+    'Apple Music backend auth/provider integration (frontend login temporarily disabled)',
     'Create playlists (public or private)',
     'Enable existing provider playlists for voting',
     'Search tracks and suggest by link',
+    'Track recommendations for SoundCloud and TIDAL playlists',
     'Vote counts with voter names in tooltips',
     'Playlist settings and collaborator list',
     'Manage tab for import/export between playlists',
@@ -66,6 +68,11 @@ function Landing() {
       description:
         'Search provider tracks inside a playlist and suggest them without leaving the page.',
       detail: 'Direct track URL suggestions are also supported.',
+    },
+    {
+      title: 'Recommendations',
+      description: 'Get related-track recommendations for supported providers inside the playlist view.',
+      detail: 'Currently available for SoundCloud and TIDAL playlists.',
     },
     {
       title: 'Voting workflow',
@@ -97,7 +104,7 @@ function Landing() {
   ]
 
   const workflowSteps = [
-    'Log in with Spotify or SoundCloud.',
+    'Log in with Spotify, SoundCloud, or TIDAL.',
     'Create or enable a playlist on your dashboard.',
     'Invite people to suggest tracks and vote.',
     'Use the Manage tab to import/export tracks with preview before execution.',
@@ -105,10 +112,10 @@ function Landing() {
 
   const plannedFeatureGroups = [
     {
-      title: 'More music providers',
+      title: 'Provider roadmap',
       items: [
-        'Apple Music login and playlist import',
-        'TIDAL login and playlist import',
+        'Re-enable Apple Music login in the frontend once auth flow hardening is complete',
+        'Broaden recommendation support where provider APIs allow it',
         'Cross-provider playlist links and metadata sync',
       ],
     },
@@ -142,7 +149,7 @@ function Landing() {
               Alpha
             </div>
             <h1 className="text-5xl font-semibold tracking-tight text-[rgb(var(--votuna-ink))] sm:text-6xl">
-              Open source playlist voting for Spotify and SoundCloud.
+              Open source playlist voting for Spotify, SoundCloud, and TIDAL.
             </h1>
             <Text className="text-lg text-[color:rgb(var(--votuna-ink)/0.7)] sm:text-xl">
               Votuna helps groups suggest tracks, vote together, and manage what gets added next.
@@ -159,7 +166,7 @@ function Landing() {
                 Next.js frontend
               </span>
               <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-                Spotify and SoundCloud support
+                Spotify, SoundCloud, and TIDAL support
               </span>
             </div>
           </Col>
