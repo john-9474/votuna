@@ -129,9 +129,7 @@ def test_get_playlist_catalog_and_resolve_url(monkeypatch):
     assert catalog.provider_playlist_id == "pl.catalog-1"
     assert catalog.title == "Catalog Playlist"
 
-    resolved = asyncio.run(
-        provider.resolve_playlist_url("https://music.apple.com/us/playlist/pl.catalog-1")
-    )
+    resolved = asyncio.run(provider.resolve_playlist_url("https://music.apple.com/us/playlist/pl.catalog-1"))
     assert resolved.provider_playlist_id == "pl.catalog-1"
 
     library = asyncio.run(provider.get_playlist("lib-1"))
@@ -257,7 +255,11 @@ def test_search_tracks_and_resolve_track_urls(monkeypatch):
                 return _response(
                     "GET",
                     "https://api.music.apple.com/v1/me/library/songs/i.333",
-                    {"data": [{"id": "i.333", "attributes": {"name": "Library Track", "artistName": "Library Artist"}}]},
+                    {
+                        "data": [
+                            {"id": "i.333", "attributes": {"name": "Library Track", "artistName": "Library Artist"}}
+                        ]
+                    },
                 )
             raise AssertionError(f"Unexpected request to {url}")
 

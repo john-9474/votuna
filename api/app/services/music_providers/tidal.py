@@ -637,9 +637,8 @@ class TidalProvider(MusicProviderClient):
                     continue
                 resource = included_index.get((resource_type, resource_id))
                 mapped_track = self._to_provider_track(resource or entry, included_index)
-                if (
-                    enrich_track_metadata
-                    and (not isinstance(resource, dict) or not isinstance(resource.get("attributes"), dict))
+                if enrich_track_metadata and (
+                    not isinstance(resource, dict) or not isinstance(resource.get("attributes"), dict)
                 ):
                     try:
                         mapped_track = await self._get_track(resource_id, resource_type)

@@ -908,12 +908,16 @@ def test_related_tracks_enriches_when_relationship_data_is_missing(monkeypatch):
                             {
                                 "id": "art-a",
                                 "type": "artworks",
-                                "attributes": {"files": [{"href": "https://resources.tidal.com/images/rel-a/640x640.jpg"}]},
+                                "attributes": {
+                                    "files": [{"href": "https://resources.tidal.com/images/rel-a/640x640.jpg"}]
+                                },
                             },
                             {
                                 "id": "art-b",
                                 "type": "artworks",
-                                "attributes": {"files": [{"href": "https://resources.tidal.com/images/rel-b/640x640.jpg"}]},
+                                "attributes": {
+                                    "files": [{"href": "https://resources.tidal.com/images/rel-b/640x640.jpg"}]
+                                },
                             },
                         ],
                     },
