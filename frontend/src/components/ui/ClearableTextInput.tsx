@@ -1,5 +1,5 @@
 import { TextInput } from '@tremor/react'
-import type { ComponentProps } from 'react'
+import { useId, type ComponentProps } from 'react'
 
 type ClearableTextInputProps = Omit<ComponentProps<typeof TextInput>, 'value' | 'onValueChange'> & {
   value: string
@@ -12,17 +12,25 @@ export default function ClearableTextInput({
   value,
   onValueChange,
   clearAriaLabel = 'Clear input',
+  id,
+  name,
   className = '',
   containerClassName = 'w-full',
   disabled,
   ...props
 }: ClearableTextInputProps) {
+  const reactId = useId()
+  const generatedId = `input-${reactId.replace(/:/g, '')}`
+  const fieldId = id ?? generatedId
+  const fieldName = name ?? fieldId
   const showClear = Boolean(value) && !disabled
 
   return (
     <div className={`relative ${containerClassName}`.trim()}>
       <TextInput
         {...props}
+        id={fieldId}
+        name={fieldName}
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}

@@ -355,7 +355,13 @@ export default function CollaboratorsSection({
               <div className="mt-3">
                 <Text className="text-xs">Invite link</Text>
                 <div className="mt-2 flex items-center gap-2">
-                  <TextInput value={invites.link.url} readOnly />
+                  <TextInput
+                    id="playlist-invite-link"
+                    name="playlist_invite_link"
+                    aria-label="Generated invite link"
+                    value={invites.link.url}
+                    readOnly
+                  />
                   <AppButton intent="secondary" onClick={() => copyInviteLink(invites.link.url)}>
                     Copy
                   </AppButton>

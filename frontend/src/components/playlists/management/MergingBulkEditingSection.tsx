@@ -1,4 +1,4 @@
-import { Card, Col, Grid, Select, SelectItem, Switch, Tab, TabGroup, TabList, Text } from '@tremor/react'
+import { Card, Col, Grid, Select, SelectItem, Tab, TabGroup, TabList, Text } from '@tremor/react'
 
 import AppButton from '@/components/ui/AppButton'
 import AppPanelRow from '@/components/ui/AppPanelRow'
@@ -25,6 +25,7 @@ const SONG_SCOPE_OPTIONS: Array<{ value: PlaylistManagementState['songScope']['v
 ]
 const TAB_BUTTON_CLASS =
   'border border-[color:rgb(var(--votuna-ink)/0.22)] data-[selected]:border-[rgb(var(--votuna-accent))]'
+const PUBLIC_PLAYLIST_TOOLTIP = 'Created playlists are private by default.'
 
 export default function MergingBulkEditingSection({ management }: MergingBulkEditingSectionProps) {
   const { action, playlists, songScope, steps } = management
@@ -204,7 +205,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                     />
                   </div>
                 ) : (
-                  <Grid className="gap-4" numItems={1} numItemsSm={2}>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
                     <div>
                       <SectionEyebrow compact tone="strong">
                         New playlist name
@@ -229,16 +230,27 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         clearAriaLabel="Clear playlist description"
                       />
                     </div>
-                    <Col numColSpanSm={2}>
-                      <label className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]">
-                        <Switch
+                    <div className="flex items-center gap-3 sm:pb-2">
+                      <label
+                        htmlFor="management-create-public"
+                        title={PUBLIC_PLAYLIST_TOOLTIP}
+                        className="flex items-center gap-3 text-sm text-[color:rgb(var(--votuna-ink)/0.75)]"
+                      >
+                        <input
+                          id="management-create-public"
+                          name="management_create_public"
+                          type="checkbox"
                           checked={playlists.destination.createForm.isPublic}
-                          onChange={playlists.destination.createForm.setIsPublic}
+                          onChange={(event) =>
+                            playlists.destination.createForm.setIsPublic(event.target.checked)
+                          }
+                          title={PUBLIC_PLAYLIST_TOOLTIP}
+                          className="h-4 w-4 rounded border-[color:rgb(var(--votuna-ink)/0.25)] bg-[rgba(var(--votuna-paper),0.9)] text-[rgb(var(--votuna-accent))] focus:ring-[rgb(var(--votuna-accent))]"
                         />
-                        Create as public playlist
+                        <span title={PUBLIC_PLAYLIST_TOOLTIP}>Public</span>
                       </label>
-                    </Col>
-                  </Grid>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -331,6 +343,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                         <label className="inline-flex items-center gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.62)]">
                           <input
                             type="checkbox"
+                            name="source_tracks_select_all"
                             checked={allVisibleTracksSelected}
                             onChange={toggleVisibleTracksSelection}
                           />
@@ -341,6 +354,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                             <AppPanelRow className="flex items-center gap-3 text-sm">
                               <input
                                 type="checkbox"
+                                name={`source_track_${track.provider_track_id}`}
                                 checked={selectedSongIdSet.has(track.provider_track_id)}
                                 onChange={() => sourcePicker.toggleSelectedSong(track.provider_track_id)}
                               />

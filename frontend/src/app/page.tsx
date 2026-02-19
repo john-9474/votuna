@@ -1,6 +1,6 @@
 'use client'
 
-import { Col, Grid, Switch, Text } from '@tremor/react'
+import { Col, Grid, Text } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
@@ -31,6 +31,7 @@ type ProviderPlaylist = {
 const EMPTY_PROVIDER_PLAYLISTS: ProviderPlaylist[] = []
 const EMPTY_VOTUNA_PLAYLISTS: VotunaPlaylist[] = []
 const EMPTY_PENDING_INVITES: PendingInvite[] = []
+const PUBLIC_PLAYLIST_TOOLTIP = 'Created playlists are private by default.'
 
 const getProviderLabel = (provider: string | null | undefined) => {
   const normalized = (provider || '').trim().toLowerCase()
@@ -481,13 +482,21 @@ export default function Home() {
                 className="bg-[rgba(var(--votuna-paper),0.85)] text-[rgb(var(--votuna-ink))]"
                 clearAriaLabel="Clear playlist title"
               />
-              <label className="flex shrink-0 items-center gap-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
-                <Switch
+              <label
+                htmlFor="new-playlist-public"
+                title={PUBLIC_PLAYLIST_TOOLTIP}
+                className="flex shrink-0 items-center gap-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]"
+              >
+                <input
+                  id="new-playlist-public"
+                  name="new_playlist_public"
+                  type="checkbox"
                   checked={newPlaylistIsPublic}
-                  onChange={(checked) => setNewPlaylistIsPublic(checked)}
-                  color="emerald"
+                  onChange={(event) => setNewPlaylistIsPublic(event.target.checked)}
+                  title={PUBLIC_PLAYLIST_TOOLTIP}
+                  className="h-4 w-4 rounded border-[color:rgb(var(--votuna-ink)/0.25)] bg-[rgba(var(--votuna-paper),0.9)] text-[rgb(var(--votuna-accent))] focus:ring-[rgb(var(--votuna-accent))]"
                 />
-                <span>{newPlaylistIsPublic ? 'Public' : 'Private'}</span>
+                <span title={PUBLIC_PLAYLIST_TOOLTIP}>Public</span>
               </label>
               <AppButton
                 onClick={() => createMutation.mutate()}

@@ -263,6 +263,8 @@ export default function ProfilePage() {
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <input
                     ref={fileInputRef}
+                    id="avatar-upload-input"
+                    name="avatar"
                     type="file"
                     accept="image/*"
                     onChange={onAvatarChange}
