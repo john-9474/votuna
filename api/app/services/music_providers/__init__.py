@@ -3,6 +3,7 @@ from app.services.music_providers.base import (
     ProviderPlaylist,
     ProviderTrack,
     ProviderUser,
+    ProviderShuffleResult,
     ProviderAuthError,
     ProviderAPIError,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "ProviderPlaylist",
     "ProviderTrack",
     "ProviderUser",
+    "ProviderShuffleResult",
     "ProviderAuthError",
     "ProviderAPIError",
     "get_music_provider",

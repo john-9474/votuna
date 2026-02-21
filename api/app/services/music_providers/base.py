@@ -1,7 +1,7 @@
 """Base classes for music provider integrations."""
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Literal, Sequence
 
 
 class ProviderAuthError(Exception):
@@ -45,6 +45,17 @@ class ProviderUser:
     display_name: str | None = None
     avatar_url: str | None = None
     profile_url: str | None = None
+
+
+@dataclass
+class ProviderShuffleResult:
+    status: Literal["completed", "partial_failure"]
+    provider: str
+    provider_playlist_id: str
+    total_items: int
+    moved_items: int
+    max_items: int
+    error: str | None = None
 
 
 class MusicProviderClient:
@@ -110,6 +121,13 @@ class MusicProviderClient:
     async def get_user(self, provider_user_id: str) -> ProviderUser:
         """Fetch a provider user by provider-specific id."""
         raise NotImplementedError
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        """Shuffle a provider playlist in place."""
+        raise ProviderAPIError(
+            f"{self.provider.capitalize()} playlist shuffling is not supported",
+            status_code=501,
+        )
 
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         tracks = await self.list_tracks(provider_playlist_id)

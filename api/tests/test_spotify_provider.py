@@ -2,7 +2,9 @@ import asyncio
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import pytest
 
+from app.services.music_providers.base import ProviderAPIError
 from app.services.music_providers.spotify import SpotifyProvider
 
 
@@ -344,3 +346,138 @@ def test_related_tracks_and_search_users_are_safe_noops():
     provider = SpotifyProvider("token")
     assert asyncio.run(provider.related_tracks("track-1")) == []
     assert asyncio.run(provider.search_users("anything")) == []
+
+
+def test_shuffle_playlist_success_and_preserves_occurrences(monkeypatch):
+    provider = SpotifyProvider("token")
+    captured_reorder_payloads: list[dict] = []
+
+    def _shuffle(_self, values: list[int]) -> None:
+        values[:] = [3, 1, 0, 2]
+
+    monkeypatch.setattr("app.services.music_providers.spotify.random.SystemRandom.shuffle", _shuffle)
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            if url == "/playlists/playlist-1/items":
+                return _response(
+                    "GET",
+                    "https://api.spotify.com/v1/playlists/playlist-1/items",
+                    {"total": 4, "items": [{}]},
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+        async def put(self, url: str, headers: dict, json: dict):
+            captured_reorder_payloads.append(dict(json))
+            return _response(
+                "PUT",
+                "https://api.spotify.com/v1/playlists/playlist-1/items",
+                {"snapshot_id": f"snapshot-{len(captured_reorder_payloads)}"},
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    result = asyncio.run(provider.shuffle_playlist("playlist-1", max_items=500))
+    assert result.status == "completed"
+    assert result.provider == "spotify"
+    assert result.provider_playlist_id == "playlist-1"
+    assert result.total_items == 4
+    assert result.moved_items == 2
+    assert result.max_items == 500
+    assert result.error is None
+
+    assert captured_reorder_payloads == [
+        {"range_start": 3, "insert_before": 0, "range_length": 1},
+        {"range_start": 2, "insert_before": 1, "range_length": 1, "snapshot_id": "snapshot-1"},
+    ]
+
+
+def test_shuffle_playlist_returns_partial_failure_when_move_fails(monkeypatch):
+    provider = SpotifyProvider("token")
+    reorder_call_count = 0
+
+    def _shuffle(_self, values: list[int]) -> None:
+        values[:] = [3, 2, 1, 0]
+
+    monkeypatch.setattr("app.services.music_providers.spotify.random.SystemRandom.shuffle", _shuffle)
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            if url == "/playlists/playlist-1/items":
+                return _response(
+                    "GET",
+                    "https://api.spotify.com/v1/playlists/playlist-1/items",
+                    {"total": 4, "items": [{}]},
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+        async def put(self, url: str, headers: dict, json: dict):
+            nonlocal reorder_call_count
+            reorder_call_count += 1
+            if reorder_call_count == 1:
+                return _response(
+                    "PUT",
+                    "https://api.spotify.com/v1/playlists/playlist-1/items",
+                    {"snapshot_id": "snapshot-1"},
+                )
+            return _response(
+                "PUT",
+                "https://api.spotify.com/v1/playlists/playlist-1/items",
+                {"error": {"message": "rate limited"}},
+                status_code=500,
+            )
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    result = asyncio.run(provider.shuffle_playlist("playlist-1", max_items=500))
+    assert result.status == "partial_failure"
+    assert result.total_items == 4
+    assert result.moved_items == 1
+    assert "Spotify API error" in (result.error or "")
+
+
+def test_shuffle_playlist_validates_max_items(monkeypatch):
+    provider = SpotifyProvider("token")
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            if url == "/playlists/playlist-1/items":
+                return _response(
+                    "GET",
+                    "https://api.spotify.com/v1/playlists/playlist-1/items",
+                    {"total": 501, "items": [{}]},
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    with pytest.raises(ProviderAPIError) as exc:
+        asyncio.run(provider.shuffle_playlist("playlist-1", max_items=500))
+    assert exc.value.status_code == 400

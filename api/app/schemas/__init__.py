@@ -38,6 +38,8 @@ from app.schemas.votuna_playlist_management import (
     ManagementSelectionMode,
     ManagementSourceTracksRequest,
     ManagementSourceTracksResponse,
+    ManagementShuffleResponse,
+    ManagementShuffleStatus,
     ManagementTransferRequest,
     ManagementVotunaPlaylistRef,
 )
@@ -110,6 +112,8 @@ __all__ = [
     "ManagementSelectionMode",
     "ManagementSourceTracksRequest",
     "ManagementSourceTracksResponse",
+    "ManagementShuffleResponse",
+    "ManagementShuffleStatus",
     "ManagementTransferRequest",
     "ManagementVotunaPlaylistRef",
     "TieBreakMode",

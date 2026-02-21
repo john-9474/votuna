@@ -16,6 +16,7 @@ from app.services.music_providers.base import (
     ProviderAPIError,
     ProviderAuthError,
     ProviderPlaylist,
+    ProviderShuffleResult,
     ProviderTrack,
     ProviderUser,
 )
@@ -519,6 +520,12 @@ class AppleMusicProvider(MusicProviderClient):
     async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         raise ProviderAPIError(
             "Apple Music track removal is not supported for library playlists",
+            status_code=501,
+        )
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        raise ProviderAPIError(
+            "Apple Music playlist shuffling is not supported for library playlists",
             status_code=501,
         )
 

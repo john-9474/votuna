@@ -178,6 +178,18 @@ export type ManagementExecuteResponse = {
   failed_items: ManagementFailedItem[]
 }
 
+export type ManagementShuffleStatus = 'completed' | 'partial_failure'
+
+export type ManagementShuffleResponse = {
+  status: ManagementShuffleStatus
+  provider: string
+  provider_playlist_id: string
+  total_items: number
+  moved_items: number
+  max_items: number
+  error?: string | null
+}
+
 export type PlayerTrack = {
   key: string
   title: string

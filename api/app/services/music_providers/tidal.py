@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 from typing import Any, Sequence
 from urllib.parse import quote, urlparse
 from uuid import UUID
@@ -15,6 +16,7 @@ from app.services.music_providers.base import (
     ProviderAPIError,
     ProviderAuthError,
     ProviderPlaylist,
+    ProviderShuffleResult,
     ProviderTrack,
     ProviderUser,
 )
@@ -746,6 +748,112 @@ class TidalProvider(MusicProviderClient):
                 json={"data": payload_data},
             )
             self._raise_for_status(response)
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        playlist_id = self._normalize_playlist_id(provider_playlist_id)
+        if not playlist_id:
+            raise ProviderAPIError("Playlist id is required", status_code=400)
+        safe_max_items = max(1, int(max_items))
+
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            playlist_items = await self._list_playlist_items(client, playlist_id)
+            missing_item_ids = [item for item in playlist_items if not item.item_id]
+            if missing_item_ids:
+                raise ProviderAPIError(
+                    "Unable to shuffle TIDAL playlist because item ids are unavailable",
+                    status_code=501,
+                )
+
+            ordered_item_ids = [item.item_id for item in playlist_items if item.item_id]
+            total_items = len(ordered_item_ids)
+            if total_items > safe_max_items:
+                raise ProviderAPIError(
+                    f"Shuffle exceeds max tracks per action ({safe_max_items})",
+                    status_code=400,
+                )
+            if total_items <= 1:
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            shuffled_item_ids = list(ordered_item_ids)
+            random.SystemRandom().shuffle(shuffled_item_ids)
+            if shuffled_item_ids == ordered_item_ids:
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            items_by_item_id = {item.item_id: item for item in playlist_items if item.item_id}
+            moved_items = 0
+            for desired_index in range(total_items - 1):
+                desired_item_id = shuffled_item_ids[desired_index]
+                current_index = ordered_item_ids.index(desired_item_id)
+                if current_index == desired_index:
+                    continue
+
+                resource = items_by_item_id.get(desired_item_id)
+                if resource is None:
+                    raise ProviderAPIError("Unable to shuffle playlist item", status_code=502)
+                position_before_item_id = ordered_item_ids[desired_index]
+                request_payload = {
+                    "data": [
+                        {
+                            "id": resource.track.provider_track_id,
+                            "type": resource.resource_type,
+                            "meta": {"itemId": desired_item_id},
+                        }
+                    ],
+                    "meta": {"positionBefore": position_before_item_id},
+                }
+
+                try:
+                    response = await client.patch(
+                        f"/playlists/{playlist_id}/relationships/items",
+                        headers=self._headers(),
+                        params=self._params(),
+                        json=request_payload,
+                    )
+                    self._raise_for_status(response)
+                except ProviderAuthError:
+                    raise
+                except ProviderAPIError as exc:
+                    if moved_items > 0:
+                        return ProviderShuffleResult(
+                            status="partial_failure",
+                            provider=self.provider,
+                            provider_playlist_id=playlist_id,
+                            total_items=total_items,
+                            moved_items=moved_items,
+                            max_items=safe_max_items,
+                            error=str(exc),
+                        )
+                    raise
+
+                moved_item_id = ordered_item_ids.pop(current_index)
+                ordered_item_ids.insert(desired_index, moved_item_id)
+                moved_items += 1
+
+        return ProviderShuffleResult(
+            status="completed",
+            provider=self.provider,
+            provider_playlist_id=playlist_id,
+            total_items=total_items,
+            moved_items=moved_items,
+            max_items=safe_max_items,
+            error=None,
+        )
 
     async def search_tracks(
         self,

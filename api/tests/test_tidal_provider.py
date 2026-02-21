@@ -85,6 +85,41 @@ def _playlist_items_ids_only_payload() -> dict:
     }
 
 
+def _shuffle_playlist_items_payload() -> dict:
+    return {
+        "data": [
+            {"id": "track-dup", "type": "tracks", "meta": {"itemId": "11111111-1111-1111-1111-111111111111"}},
+            {"id": "track-dup", "type": "tracks", "meta": {"itemId": "22222222-2222-2222-2222-222222222222"}},
+            {"id": "video-1", "type": "videos", "meta": {"itemId": "33333333-3333-3333-3333-333333333333"}},
+            {"id": "track-2", "type": "tracks", "meta": {"itemId": "44444444-4444-4444-4444-444444444444"}},
+        ],
+        "included": [
+            {
+                "id": "track-dup",
+                "type": "tracks",
+                "attributes": {"title": "Duplicate Track"},
+                "relationships": {"artists": {"data": [{"type": "artists", "id": "artist-1"}]}},
+            },
+            {
+                "id": "video-1",
+                "type": "videos",
+                "attributes": {"title": "Video One"},
+                "relationships": {"artists": {"data": [{"type": "artists", "id": "artist-2"}]}},
+            },
+            {
+                "id": "track-2",
+                "type": "tracks",
+                "attributes": {"title": "Track Two"},
+                "relationships": {"artists": {"data": [{"type": "artists", "id": "artist-3"}]}},
+            },
+            {"id": "artist-1", "type": "artists", "attributes": {"name": "Artist One"}},
+            {"id": "artist-2", "type": "artists", "attributes": {"name": "Artist Two"}},
+            {"id": "artist-3", "type": "artists", "attributes": {"name": "Artist Three"}},
+        ],
+        "next": None,
+    }
+
+
 def test_list_playlists_fetches_current_user_and_maps(monkeypatch):
     monkeypatch.setattr(settings, "TIDAL_COUNTRY_CODE", "US")
     provider = TidalProvider("access-token")
@@ -484,6 +519,163 @@ def test_add_tracks_omits_invalid_position_before_value(monkeypatch):
             {"id": "track-3", "type": "tracks"},
         ]
     }
+
+
+def test_shuffle_playlist_reorders_using_item_ids_and_preserves_duplicates(monkeypatch):
+    monkeypatch.setattr(settings, "TIDAL_COUNTRY_CODE", "")
+    provider = TidalProvider("access-token")
+    captured_patch_payloads: list[dict] = []
+
+    def _shuffle(_self, values: list[str]) -> None:
+        values[:] = [values[1], values[2], values[0], values[3]]
+
+    monkeypatch.setattr("app.services.music_providers.tidal.random.SystemRandom.shuffle", _shuffle)
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            parsed = urlparse(url)
+            if parsed.path == "/playlists/pl-1/relationships/items":
+                return _response(
+                    "GET",
+                    "https://openapi.tidal.com/v2/playlists/pl-1/relationships/items",
+                    _shuffle_playlist_items_payload(),
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+        async def patch(self, url: str, headers: dict, params: dict | None = None, json: dict | None = None):
+            captured_patch_payloads.append(json or {})
+            request = httpx.Request("PATCH", "https://openapi.tidal.com/v2/playlists/pl-1/relationships/items")
+            return httpx.Response(204, request=request)
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    result = asyncio.run(provider.shuffle_playlist("pl-1", max_items=500))
+
+    assert result.status == "completed"
+    assert result.total_items == 4
+    assert result.moved_items == 2
+    assert result.error is None
+    assert captured_patch_payloads == [
+        {
+            "data": [
+                {
+                    "id": "track-dup",
+                    "type": "tracks",
+                    "meta": {"itemId": "22222222-2222-2222-2222-222222222222"},
+                }
+            ],
+            "meta": {"positionBefore": "11111111-1111-1111-1111-111111111111"},
+        },
+        {
+            "data": [
+                {
+                    "id": "video-1",
+                    "type": "videos",
+                    "meta": {"itemId": "33333333-3333-3333-3333-333333333333"},
+                }
+            ],
+            "meta": {"positionBefore": "11111111-1111-1111-1111-111111111111"},
+        },
+    ]
+
+
+def test_shuffle_playlist_returns_partial_failure_when_move_fails(monkeypatch):
+    monkeypatch.setattr(settings, "TIDAL_COUNTRY_CODE", "")
+    provider = TidalProvider("access-token")
+    patch_calls = 0
+
+    def _shuffle(_self, values: list[str]) -> None:
+        values[:] = [values[1], values[2], values[0], values[3]]
+
+    monkeypatch.setattr("app.services.music_providers.tidal.random.SystemRandom.shuffle", _shuffle)
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            parsed = urlparse(url)
+            if parsed.path == "/playlists/pl-1/relationships/items":
+                return _response(
+                    "GET",
+                    "https://openapi.tidal.com/v2/playlists/pl-1/relationships/items",
+                    _shuffle_playlist_items_payload(),
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+        async def patch(self, url: str, headers: dict, params: dict | None = None, json: dict | None = None):
+            nonlocal patch_calls
+            patch_calls += 1
+            request = httpx.Request("PATCH", "https://openapi.tidal.com/v2/playlists/pl-1/relationships/items")
+            if patch_calls == 1:
+                return httpx.Response(204, request=request)
+            return httpx.Response(500, request=request, json={"errors": [{"detail": "cannot move"}]})
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    result = asyncio.run(provider.shuffle_playlist("pl-1", max_items=500))
+
+    assert result.status == "partial_failure"
+    assert result.total_items == 4
+    assert result.moved_items == 1
+    assert "TIDAL API error" in (result.error or "")
+
+
+def test_shuffle_playlist_validates_max_items(monkeypatch):
+    monkeypatch.setattr(settings, "TIDAL_COUNTRY_CODE", "")
+    provider = TidalProvider("access-token")
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            parsed = urlparse(url)
+            if parsed.path == "/playlists/pl-1/relationships/items":
+                return _response(
+                    "GET",
+                    "https://openapi.tidal.com/v2/playlists/pl-1/relationships/items",
+                    {
+                        "data": [
+                            {
+                                "id": f"track-{index}",
+                                "type": "tracks",
+                                "meta": {"itemId": f"item-{index}"},
+                            }
+                            for index in range(501)
+                        ],
+                        "included": [],
+                        "next": None,
+                    },
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    with pytest.raises(ProviderAPIError) as exc:
+        asyncio.run(provider.shuffle_playlist("pl-1", max_items=500))
+    assert exc.value.status_code == 400
 
 
 def test_search_tracks_and_search_playlists(monkeypatch):

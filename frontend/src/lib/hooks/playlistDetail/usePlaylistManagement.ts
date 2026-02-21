@@ -1,10 +1,13 @@
-import type { QueryClient } from '@tanstack/react-query'
+import { useMutation, type QueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { apiJson, type ApiError } from '@/lib/api'
+import { queryKeys } from '@/lib/constants/queryKeys'
 import type {
   ManagementExecuteResponse,
   ManagementPlaylistRef,
   ManagementPreviewResponse,
+  ManagementShuffleResponse,
   ManagementSourceTracksResponse,
   VotunaPlaylist,
 } from '@/lib/types/votuna'
@@ -134,6 +137,12 @@ export type PlaylistManagementState = {
     runResult: ManagementExecuteResponse | null
     runError: string
   }
+  shuffle: {
+    run: () => void
+    isRunning: boolean
+    result: ManagementShuffleResponse | null
+    statusMessage: string
+  }
 }
 
 type UsePlaylistManagementArgs = {
@@ -149,11 +158,6 @@ const DEFAULT_UTILITY_SECTIONS = [
     id: 'duplicate-cleanup',
     title: 'Duplicate cleanup',
     description: 'Coming soon: remove duplicate songs inside a playlist.',
-  },
-  {
-    id: 'reorder-tools',
-    title: 'Reorder tools',
-    description: 'Coming soon: reorder manually or apply smart sort presets.',
   },
   {
     id: 'more-utilities',
@@ -183,6 +187,8 @@ export function usePlaylistManagement({
   const [genreCustomInput, setGenreCustomInput] = useState('')
   const [selectedArtists, setSelectedArtists] = useState<string[]>([])
   const [artistCustomInput, setArtistCustomInput] = useState('')
+  const [shuffleResult, setShuffleResult] = useState<ManagementShuffleResponse | null>(null)
+  const [shuffleStatusMessage, setShuffleStatusMessage] = useState('')
 
   const direction = actionToDirection(action)
 
@@ -300,6 +306,51 @@ export function usePlaylistManagement({
     selectionMode: songScope,
     selectionValues: transferSelectionValues,
   })
+
+  useEffect(() => {
+    setShuffleResult(null)
+    setShuffleStatusMessage('')
+  }, [playlistId])
+
+  const shuffleMutation = useMutation({
+    mutationFn: async () => {
+      if (!playlistId) {
+        throw new Error('Playlist id is required')
+      }
+      return apiJson<ManagementShuffleResponse>(
+        `/api/v1/votuna/playlists/${playlistId}/management/shuffle`,
+        {
+          method: 'POST',
+          authRequired: true,
+        },
+      )
+    },
+    onMutate: () => {
+      setShuffleResult(null)
+      setShuffleStatusMessage('')
+    },
+    onSuccess: async (data) => {
+      setShuffleResult(data)
+      if (data.status === 'partial_failure') {
+        setShuffleStatusMessage(data.error || 'Shuffle partially completed.')
+      } else if (data.moved_items > 0) {
+        setShuffleStatusMessage(`Shuffle completed. Moved ${data.moved_items} songs.`)
+      } else {
+        setShuffleStatusMessage('Shuffle completed. Playlist order did not change.')
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.votunaTracks(playlistId) })
+    },
+    onError: (error) => {
+      const apiError = error as ApiError
+      setShuffleResult(null)
+      setShuffleStatusMessage(apiError?.detail || apiError?.message || 'Unable to shuffle playlist')
+    },
+  })
+
+  const runShuffle = useCallback(() => {
+    if (!playlistId || !canManage || shuffleMutation.isPending) return
+    shuffleMutation.mutate()
+  }, [canManage, playlistId, shuffleMutation])
 
   const selectedCounterpartyOption = useMemo(
     () =>
@@ -521,6 +572,12 @@ export function usePlaylistManagement({
       isRunning: transferState.isExecutePending,
       runResult: transferState.executeResult,
       runError: transferState.executeError,
+    },
+    shuffle: {
+      run: runShuffle,
+      isRunning: shuffleMutation.isPending,
+      result: shuffleResult,
+      statusMessage: shuffleStatusMessage,
     },
   }
 }

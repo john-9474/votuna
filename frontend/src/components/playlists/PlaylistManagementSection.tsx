@@ -2,6 +2,7 @@ import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlay
 import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import MergingBulkEditingSection from '@/components/playlists/management/MergingBulkEditingSection'
+import ShufflePlaylistSection from '@/components/playlists/management/ShufflePlaylistSection'
 import UtilityStubSection from '@/components/playlists/management/UtilityStubSection'
 
 type PlaylistManagementSectionProps = {
@@ -33,6 +34,7 @@ export default function PlaylistManagementSection({ management }: PlaylistManage
   return (
     <div className="space-y-6">
       <MergingBulkEditingSection management={management} />
+      <ShufflePlaylistSection shuffle={management.shuffle} />
       {management.utilitySections.map((section) => (
         <UtilityStubSection
           key={section.id}

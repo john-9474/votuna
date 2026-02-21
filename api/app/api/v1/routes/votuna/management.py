@@ -31,6 +31,7 @@ from app.schemas.votuna_playlist_management import (
     ManagementPlaylistSummary,
     ManagementPreviewResponse,
     ManagementSelectionMode,
+    ManagementShuffleResponse,
     ManagementSourceTracksRequest,
     ManagementSourceTracksResponse,
     ManagementTransferRequest,
@@ -40,6 +41,7 @@ from app.services.music_providers import MusicProviderClient, ProviderAPIError, 
 router = APIRouter()
 
 MAX_TRACKS_PER_ACTION = 500
+MAX_TRACKS_PER_SHUFFLE = 500
 ADD_CHUNK_SIZE = 100
 FACETS_LIMIT = 100
 
@@ -412,6 +414,48 @@ async def list_management_facets(
         genres=_build_facet_counts(track.genre for track in tracks),
         artists=_build_facet_counts(track.artist for track in tracks),
         total_tracks_considered=len(tracks),
+    )
+
+
+@router.post(
+    "/playlists/{playlist_id}/management/shuffle",
+    response_model=ManagementShuffleResponse,
+)
+async def shuffle_management_playlist(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Shuffle provider playlist item order in place for the current Votuna playlist."""
+    playlist = require_owner(db, playlist_id, current_user.id)
+    client = get_owner_client(db, playlist)
+    try:
+        shuffle_result = await client.shuffle_playlist(
+            playlist.provider_playlist_id,
+            max_items=MAX_TRACKS_PER_SHUFFLE,
+        )
+    except ProviderAuthError:
+        raise_provider_auth(
+            current_user,
+            owner_id=playlist.owner_user_id,
+            provider=playlist.provider,
+        )
+        raise AssertionError("unreachable")
+    except ProviderAPIError as exc:
+        if exc.status_code == status.HTTP_501_NOT_IMPLEMENTED:
+            raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail=str(exc)) from exc
+        if exc.status_code == status.HTTP_400_BAD_REQUEST:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    return ManagementShuffleResponse(
+        status=shuffle_result.status,
+        provider=shuffle_result.provider,  # type: ignore[arg-type]
+        provider_playlist_id=shuffle_result.provider_playlist_id,
+        total_items=shuffle_result.total_items,
+        moved_items=shuffle_result.moved_items,
+        max_items=shuffle_result.max_items,
+        error=shuffle_result.error,
     )
 
 

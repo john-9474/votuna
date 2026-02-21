@@ -134,6 +134,59 @@ def test_execute_import_records_playlist_utils_provenance(auth_client, db_sessio
     assert additions["track-a"].added_at is not None
 
 
+def test_management_shuffle_owner_success(auth_client, votuna_playlist, provider_stub):
+    provider_stub.shuffle_result_status = "completed"
+    provider_stub.shuffle_total_items = 6
+    provider_stub.shuffle_moved_items = 4
+
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "completed"
+    assert data["provider"] == votuna_playlist.provider
+    assert data["provider_playlist_id"] == votuna_playlist.provider_playlist_id
+    assert data["total_items"] == 6
+    assert data["moved_items"] == 4
+    assert data["max_items"] == 500
+    assert data["error"] is None
+    assert provider_stub.shuffle_calls[-1]["provider_playlist_id"] == votuna_playlist.provider_playlist_id
+    assert provider_stub.shuffle_calls[-1]["max_items"] == 500
+
+
+def test_management_shuffle_partial_failure_returns_200(auth_client, votuna_playlist, provider_stub):
+    provider_stub.shuffle_result_status = "partial_failure"
+    provider_stub.shuffle_total_items = 8
+    provider_stub.shuffle_moved_items = 3
+    provider_stub.shuffle_error_message = "Provider failed mid-shuffle"
+
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial_failure"
+    assert data["total_items"] == 8
+    assert data["moved_items"] == 3
+    assert data["error"] == "Provider failed mid-shuffle"
+
+
+def test_management_shuffle_non_owner_forbidden(other_auth_client, votuna_playlist):
+    response = other_auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")
+    assert response.status_code == 403
+
+
+def test_management_shuffle_unsupported_provider_returns_405(auth_client, votuna_playlist, provider_stub):
+    provider_stub.shuffle_raise_status_code = 501
+
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")
+    assert response.status_code == 405
+
+
+def test_management_shuffle_over_limit_returns_400(auth_client, votuna_playlist, provider_stub):
+    provider_stub.shuffle_raise_status_code = 400
+
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")
+    assert response.status_code == 400
+
+
 def test_management_non_owner_forbidden(other_auth_client, votuna_playlist):
     response = other_auth_client.post(
         f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/preview",

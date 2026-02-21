@@ -26,6 +26,7 @@ from app.crud.votuna_playlist_settings import votuna_playlist_settings_crud
 from app.services.music_providers.base import (
     ProviderAPIError,
     ProviderPlaylist,
+    ProviderShuffleResult,
     ProviderTrack,
     ProviderUser,
 )
@@ -213,6 +214,12 @@ class DummyProvider:
     }
     related_tracks_calls: list[dict] = []
     fail_related_status_code: int | None = None
+    shuffle_calls: list[dict] = []
+    shuffle_raise_status_code: int | None = None
+    shuffle_result_status: str = "completed"
+    shuffle_total_items: int = 0
+    shuffle_moved_items: int = 0
+    shuffle_error_message: str | None = None
 
     def __init__(self, access_token: str):
         self.access_token = access_token
@@ -358,6 +365,25 @@ class DummyProvider:
 
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         return self.track_exists_value
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        self.shuffle_calls.append(
+            {
+                "provider_playlist_id": provider_playlist_id,
+                "max_items": max_items,
+            }
+        )
+        if self.shuffle_raise_status_code is not None:
+            raise ProviderAPIError("shuffle failed", status_code=self.shuffle_raise_status_code)
+        return ProviderShuffleResult(
+            status=self.shuffle_result_status,  # type: ignore[arg-type]
+            provider=self.provider,
+            provider_playlist_id=provider_playlist_id,
+            total_items=self.shuffle_total_items,
+            moved_items=self.shuffle_moved_items,
+            max_items=max_items,
+            error=self.shuffle_error_message if self.shuffle_result_status == "partial_failure" else None,
+        )
 
 
 TEST_DATABASE_URL = "sqlite+pysqlite://"
@@ -715,6 +741,12 @@ def provider_stub(monkeypatch):
     }
     DummyProvider.related_tracks_calls = []
     DummyProvider.fail_related_status_code = None
+    DummyProvider.shuffle_calls = []
+    DummyProvider.shuffle_raise_status_code = None
+    DummyProvider.shuffle_result_status = "completed"
+    DummyProvider.shuffle_total_items = len(DummyProvider.tracks_by_playlist_id["provider-1"])
+    DummyProvider.shuffle_moved_items = 0
+    DummyProvider.shuffle_error_message = None
 
     def _factory(provider: str, access_token: str):
         return DummyProvider(access_token)

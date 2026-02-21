@@ -298,6 +298,15 @@ def test_remove_and_user_apis_are_explicitly_unsupported(monkeypatch):
     assert user_exc.value.status_code == 501
 
 
+def test_shuffle_playlist_is_explicitly_unsupported(monkeypatch):
+    monkeypatch.setattr(settings, "APPLE_MUSIC_DEVELOPER_TOKEN", "dev-token")
+    provider = AppleMusicProvider("user-token")
+
+    with pytest.raises(ProviderAPIError) as exc:
+        asyncio.run(provider.shuffle_playlist("playlist-1"))
+    assert exc.value.status_code == 501
+
+
 def test_list_playlists_raises_provider_auth_error_on_unauthorized(monkeypatch):
     monkeypatch.setattr(settings, "APPLE_MUSIC_DEVELOPER_TOKEN", "dev-token")
     provider = AppleMusicProvider("user-token")

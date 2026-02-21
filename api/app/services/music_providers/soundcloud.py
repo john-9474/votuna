@@ -1,6 +1,7 @@
 """SoundCloud provider integration."""
 
 import logging
+import random
 from typing import Any, Sequence
 from urllib.parse import urlparse
 import httpx
@@ -11,6 +12,7 @@ from app.services.music_providers.base import (
     ProviderPlaylist,
     ProviderTrack,
     ProviderUser,
+    ProviderShuffleResult,
     ProviderAuthError,
     ProviderAPIError,
 )
@@ -692,6 +694,111 @@ class SoundcloudProvider(MusicProviderClient):
                 json=update_payload,
             )
             self._raise_for_status(update_response)
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        playlist_id = provider_playlist_id.strip()
+        if not playlist_id:
+            raise ProviderAPIError("Playlist id is required", status_code=400)
+        safe_max_items = max(1, int(max_items))
+
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
+            response = await client.get(
+                f"/playlists/{playlist_id}",
+                headers=self._headers(),
+                params=self._params(),
+            )
+            self._raise_for_status(response)
+            payload = response.json()
+
+            if not isinstance(payload, dict):
+                raise ProviderAPIError("Unable to load playlist", status_code=502)
+
+            existing_tracks = payload.get("tracks", []) or []
+            track_refs: list[dict[str, str]] = []
+            missing_references = 0
+            for track in existing_tracks:
+                reference = self._extract_track_reference_from_payload(track)
+                if not reference:
+                    missing_references += 1
+                    continue
+                track_ref, _track_key = reference
+                track_refs.append(track_ref)
+
+            if missing_references:
+                raise ProviderAPIError(
+                    "Unable to shuffle playlist because some track references are unsupported",
+                    status_code=501,
+                )
+
+            total_items = len(track_refs)
+            if total_items > safe_max_items:
+                raise ProviderAPIError(
+                    f"Shuffle exceeds max tracks per action ({safe_max_items})",
+                    status_code=400,
+                )
+            if total_items <= 1:
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            shuffled_track_refs = list(track_refs)
+            random.SystemRandom().shuffle(shuffled_track_refs)
+            if shuffled_track_refs == track_refs:
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            moved_items_estimate = sum(
+                1 for original, shuffled in zip(track_refs, shuffled_track_refs) if original != shuffled
+            )
+            update_payload = {
+                "playlist": {
+                    "title": payload.get("title") or "Untitled",
+                    "tracks": shuffled_track_refs,
+                }
+            }
+            try:
+                update_response = await client.put(
+                    f"/playlists/{playlist_id}",
+                    headers=self._headers(),
+                    params=self._params(),
+                    json=update_payload,
+                )
+                self._raise_for_status(update_response)
+            except ProviderAuthError:
+                raise
+            except ProviderAPIError as exc:
+                return ProviderShuffleResult(
+                    status="partial_failure",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=moved_items_estimate,
+                    max_items=safe_max_items,
+                    error=str(exc),
+                )
+
+        return ProviderShuffleResult(
+            status="completed",
+            provider=self.provider,
+            provider_playlist_id=playlist_id,
+            total_items=total_items,
+            moved_items=moved_items_estimate,
+            max_items=safe_max_items,
+            error=None,
+        )
 
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         track_reference = self._build_track_reference(track_id)

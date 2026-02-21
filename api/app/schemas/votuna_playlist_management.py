@@ -8,6 +8,7 @@ from app.schemas.votuna_playlist import MusicProvider, ProviderTrackOut
 
 ManagementDirection = Literal["import_to_current", "export_from_current"]
 ManagementSelectionMode = Literal["all", "genre", "artist", "songs"]
+ManagementShuffleStatus = Literal["completed", "partial_failure"]
 
 
 class ManagementProviderPlaylistRef(BaseModel):
@@ -103,3 +104,13 @@ class ManagementExecuteResponse(BaseModel):
     skipped_duplicate_count: int
     failed_count: int
     failed_items: list[ManagementFailedItem] = Field(default_factory=list)
+
+
+class ManagementShuffleResponse(BaseModel):
+    status: ManagementShuffleStatus
+    provider: MusicProvider
+    provider_playlist_id: str
+    total_items: int
+    moved_items: int
+    max_items: int
+    error: str | None = None

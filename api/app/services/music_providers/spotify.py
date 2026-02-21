@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import random
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -18,6 +19,7 @@ from app.services.music_providers.base import (
     ProviderAPIError,
     ProviderAuthError,
     ProviderPlaylist,
+    ProviderShuffleResult,
     ProviderTrack,
     ProviderUser,
 )
@@ -355,6 +357,26 @@ class SpotifyProvider(MusicProviderClient):
             raise ProviderAPIError("Unable to fetch Spotify user profile", status_code=502)
         return user_id
 
+    async def _fetch_playlist_item_total(self, client: httpx.AsyncClient, playlist_id: str) -> int:
+        response = await self._request_with_rate_limit_retry(
+            lambda: client.get(
+                f"/playlists/{playlist_id}/items",
+                headers=self._headers(),
+                params={"limit": 1, "offset": 0},
+            )
+        )
+        self._raise_for_status(response)
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ProviderAPIError("Unable to load playlist items", status_code=502)
+        raw_total = payload.get("total")
+        if isinstance(raw_total, int) and raw_total >= 0:
+            return raw_total
+        items = payload.get("items")
+        if isinstance(items, list):
+            return len(items)
+        raise ProviderAPIError("Unable to determine playlist item count", status_code=502)
+
     async def list_playlists(self) -> Sequence[ProviderPlaylist]:
         cache_key = self._playlist_cache_key()
         cached_playlists = self._get_cached_list(
@@ -590,6 +612,111 @@ class SpotifyProvider(MusicProviderClient):
             self._raise_for_status(response)
         self._invalidate_track_cache(playlist_id)
         self._invalidate_playlist_cache()
+
+    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+        playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
+        if not playlist_id:
+            raise ProviderAPIError("Playlist id is required", status_code=400)
+        safe_max_items = max(1, int(max_items))
+
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
+            total_items = await self._fetch_playlist_item_total(client, playlist_id)
+            if total_items > safe_max_items:
+                raise ProviderAPIError(
+                    f"Shuffle exceeds max tracks per action ({safe_max_items})",
+                    status_code=400,
+                )
+            if total_items <= 1:
+                self._invalidate_track_cache(playlist_id)
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            current_tokens = list(range(total_items))
+            shuffled_tokens = list(current_tokens)
+            random.SystemRandom().shuffle(shuffled_tokens)
+            if shuffled_tokens == current_tokens:
+                self._invalidate_track_cache(playlist_id)
+                return ProviderShuffleResult(
+                    status="completed",
+                    provider=self.provider,
+                    provider_playlist_id=playlist_id,
+                    total_items=total_items,
+                    moved_items=0,
+                    max_items=safe_max_items,
+                    error=None,
+                )
+
+            moved_items = 0
+            snapshot_id: str | None = None
+            for desired_index in range(total_items):
+                desired_token = shuffled_tokens[desired_index]
+                current_index = current_tokens.index(desired_token)
+                if current_index == desired_index:
+                    continue
+
+                request_payload: dict[str, int | str] = {
+                    "range_start": current_index,
+                    "insert_before": desired_index,
+                    "range_length": 1,
+                }
+                if snapshot_id:
+                    request_payload["snapshot_id"] = snapshot_id
+
+                try:
+                    response = await self._request_with_rate_limit_retry(
+                        lambda: client.put(
+                            f"/playlists/{playlist_id}/items",
+                            headers=self._headers(),
+                            json=request_payload,
+                        )
+                    )
+                    self._raise_for_status(response)
+                except ProviderAuthError:
+                    raise
+                except ProviderAPIError as exc:
+                    self._invalidate_track_cache(playlist_id)
+                    if moved_items > 0:
+                        return ProviderShuffleResult(
+                            status="partial_failure",
+                            provider=self.provider,
+                            provider_playlist_id=playlist_id,
+                            total_items=total_items,
+                            moved_items=moved_items,
+                            max_items=safe_max_items,
+                            error=str(exc),
+                        )
+                    raise
+
+                try:
+                    response_payload = response.json()
+                except Exception:
+                    response_payload = None
+                if isinstance(response_payload, dict):
+                    next_snapshot_id = response_payload.get("snapshot_id")
+                    if isinstance(next_snapshot_id, str) and next_snapshot_id.strip():
+                        snapshot_id = next_snapshot_id.strip()
+
+                moved_token = current_tokens.pop(current_index)
+                current_tokens.insert(desired_index, moved_token)
+                moved_items += 1
+
+        self._invalidate_track_cache(playlist_id)
+        return ProviderShuffleResult(
+            status="completed",
+            provider=self.provider,
+            provider_playlist_id=playlist_id,
+            total_items=total_items,
+            moved_items=moved_items,
+            max_items=safe_max_items,
+            error=None,
+        )
 
     async def search_tracks(self, query: str, limit: int = 10) -> Sequence[ProviderTrack]:
         search_query = query.strip()
