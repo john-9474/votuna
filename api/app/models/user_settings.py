@@ -19,5 +19,6 @@ class UserSettings(BaseModel):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     theme: Mapped[str] = mapped_column(default="system", nullable=False)
     receive_emails: Mapped[bool] = mapped_column(default=True)
+    default_table_page_size: Mapped[int] = mapped_column(default=10, nullable=False)
 
     user: Mapped["User"] = relationship(back_populates="settings")

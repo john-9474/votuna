@@ -4,13 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { apiJsonOrNull } from '../lib/api'
-
-type ThemeSetting = 'light' | 'dark' | 'system'
-
-type UserSettings = {
-  theme: ThemeSetting
-  receive_emails: boolean
-}
+import type { ThemeSetting, UserSettings } from '@/lib/types/userSettings'
 
 const THEME_STORAGE_KEY = 'votuna-theme'
 

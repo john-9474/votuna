@@ -17,13 +17,7 @@ import UserAvatar from '@/components/ui/UserAvatar'
 import { apiJson, API_URL } from '@/lib/api'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { User } from '@/lib/types/user'
-
-type ThemeSetting = 'light' | 'dark' | 'system'
-
-type UserSettings = {
-  theme: ThemeSetting
-  receive_emails: boolean
-}
+import type { TablePageSizeSetting, ThemeSetting, UserSettings } from '@/lib/types/userSettings'
 
 const THEME_STORAGE_KEY = 'votuna-theme'
 
@@ -44,6 +38,7 @@ export default function ProfilePage() {
   const [settingsForm, setSettingsForm] = useState<UserSettings>({
     theme: 'system',
     receive_emails: true,
+    default_table_page_size: 10,
   })
   const [settingsStatus, setSettingsStatus] = useState('')
 
@@ -79,6 +74,7 @@ export default function ProfilePage() {
     setSettingsForm({
       theme: payload.theme,
       receive_emails: payload.receive_emails,
+      default_table_page_size: payload.default_table_page_size,
     })
   }
 
@@ -211,7 +207,8 @@ export default function ProfilePage() {
   const settingsDirty =
     !!settings &&
     (settingsForm.theme !== settings.theme ||
-      settingsForm.receive_emails !== settings.receive_emails)
+      settingsForm.receive_emails !== settings.receive_emails ||
+      settingsForm.default_table_page_size !== settings.default_table_page_size)
 
   if (userQuery.isLoading) {
     return (
@@ -385,6 +382,29 @@ export default function ProfilePage() {
                 />
                 Receive product updates and notifications.
               </label>
+            </div>
+            <div>
+              <SectionEyebrow compact>Tables</SectionEyebrow>
+              <div className="mt-2">
+                <Select
+                  value={String(settingsForm.default_table_page_size)}
+                  onValueChange={(value) =>
+                    updateSettingsField(
+                      'default_table_page_size',
+                      Number(value) as TablePageSizeSetting,
+                    )
+                  }
+                  className="relative z-20 w-full"
+                >
+                  <SelectItem value="10">10 rows</SelectItem>
+                  <SelectItem value="25">25 rows</SelectItem>
+                  <SelectItem value="50">50 rows</SelectItem>
+                  <SelectItem value="100">100 rows</SelectItem>
+                </Select>
+              </div>
+              <Text className="mt-2 text-xs">
+                Set your default page size for all tables.
+              </Text>
             </div>
           </Grid>
           {settingsStatus ? (
