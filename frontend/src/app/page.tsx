@@ -32,6 +32,9 @@ const EMPTY_PROVIDER_PLAYLISTS: ProviderPlaylist[] = []
 const EMPTY_VOTUNA_PLAYLISTS: VotunaPlaylist[] = []
 const EMPTY_PENDING_INVITES: PendingInvite[] = []
 const PUBLIC_PLAYLIST_TOOLTIP = 'Created playlists are private by default.'
+const PROVIDER_PLAYLISTS_REFRESH_MS = 15_000
+const VOTUNA_PLAYLISTS_REFRESH_MS = 10_000
+const PENDING_INVITES_REFRESH_MS = 10_000
 
 const getProviderLabel = (provider: string | null | undefined) => {
   const normalized = (provider || '').trim().toLowerCase()
@@ -275,24 +278,24 @@ export default function Home() {
     queryFn: () =>
       apiJson<ProviderPlaylist[]>(`/api/v1/playlists/providers/${activeProvider}`, { authRequired: true }),
     enabled: !!user?.id && !!activeProvider,
-    refetchInterval: 180_000,
-    staleTime: 60_000,
+    refetchInterval: PROVIDER_PLAYLISTS_REFRESH_MS,
+    staleTime: PROVIDER_PLAYLISTS_REFRESH_MS,
   })
 
   const votunaQuery = useQuery({
     queryKey: queryKeys.votunaPlaylists,
     queryFn: () => apiJson<VotunaPlaylist[]>('/api/v1/votuna/playlists', { authRequired: true }),
     enabled: !!user?.id,
-    refetchInterval: 60_000,
-    staleTime: 10_000,
+    refetchInterval: VOTUNA_PLAYLISTS_REFRESH_MS,
+    staleTime: VOTUNA_PLAYLISTS_REFRESH_MS,
   })
 
   const pendingInvitesQuery = useQuery({
     queryKey: queryKeys.votunaPendingInvites,
     queryFn: () => apiJson<PendingInvite[]>('/api/v1/votuna/invites/pending', { authRequired: true }),
     enabled: !!user?.id,
-    refetchInterval: 60_000,
-    staleTime: 10_000,
+    refetchInterval: PENDING_INVITES_REFRESH_MS,
+    staleTime: PENDING_INVITES_REFRESH_MS,
   })
 
   const providerPlaylists = providerQuery.data ?? EMPTY_PROVIDER_PLAYLISTS
