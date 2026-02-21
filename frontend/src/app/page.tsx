@@ -547,7 +547,7 @@ export default function Home() {
                           </Text>
                         )}
                         <Text className="mt-1 text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">
-                          Shared via {playlist.provider}
+                          {playlist.track_count ?? 0} tracks - Shared via {playlist.provider}
                         </Text>
                       </div>
                       <AppRouteButton href={`/playlists/${playlist.id}`}>Open</AppRouteButton>

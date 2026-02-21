@@ -49,14 +49,19 @@ def _display_name(user: User) -> str:
     return user.display_name or user.first_name or user.email or user.provider_user_id or f"User {user.id}"
 
 
-def _to_votuna_playlist_out(playlist, owner_profile_url: str | None = None) -> VotunaPlaylistOut:
+def _to_votuna_playlist_out(
+    playlist,
+    owner_profile_url: str | None = None,
+    track_count: int | None = None,
+) -> VotunaPlaylistOut:
     payload = VotunaPlaylistOut.model_validate(playlist).model_dump()
     payload["owner_profile_url"] = owner_profile_url
+    payload["track_count"] = track_count
     return VotunaPlaylistOut(**payload)
 
 
 @router.get("/playlists", response_model=list[VotunaPlaylistOut])
-def list_votuna_playlists(
+async def list_votuna_playlists(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -67,10 +72,23 @@ def list_votuna_playlists(
     if owner_ids:
         owner_rows = db.query(User).filter(User.id.in_(owner_ids)).all()
         owner_profile_by_id = {owner.id: owner.permalink_url for owner in owner_rows}
+    collaborator_track_count_by_id: dict[int, int | None] = {}
+    for playlist in playlists:
+        if playlist.owner_user_id == current_user.id:
+            continue
+        track_count: int | None = None
+        try:
+            client = get_owner_client(db, playlist)
+            provider_playlist = await client.get_playlist(playlist.provider_playlist_id)
+            track_count = provider_playlist.track_count
+        except (HTTPException, ProviderAuthError, ProviderAPIError):
+            track_count = None
+        collaborator_track_count_by_id[playlist.id] = track_count
     return [
         _to_votuna_playlist_out(
             playlist,
             owner_profile_url=owner_profile_by_id.get(playlist.owner_user_id),
+            track_count=collaborator_track_count_by_id.get(playlist.id),
         )
         for playlist in playlists
     ]

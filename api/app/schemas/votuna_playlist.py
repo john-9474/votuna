@@ -67,6 +67,7 @@ class VotunaPlaylistOut(BaseModel):
     title: str
     description: str | None = None
     image_url: str | None = None
+    track_count: int | None = None
     is_active: bool
     last_synced_at: datetime | None = None
     created_at: datetime

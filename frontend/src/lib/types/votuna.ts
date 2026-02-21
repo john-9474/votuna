@@ -19,6 +19,7 @@ export type VotunaPlaylist = {
   title: string
   description?: string | null
   image_url?: string | null
+  track_count?: number | null
   provider: string
   provider_playlist_id: string
   is_active: boolean
