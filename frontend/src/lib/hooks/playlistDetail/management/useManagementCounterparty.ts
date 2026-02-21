@@ -117,7 +117,7 @@ export function useManagementCounterparty({
       ) {
         continue
       }
-      const option = {
+      const option: ManagementCounterpartyOption = {
         key: `votuna:${votunaPlaylist.id}`,
         label: votunaPlaylist.title,
         sourceTypeLabel: 'Votuna playlist',
