@@ -76,12 +76,13 @@ export default function TracksSection({
                     href={track.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="block truncate text-sm font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
+                    className="block max-w-full truncate text-sm font-semibold text-[rgb(var(--votuna-ink))] hover:underline"
+                    title={track.title}
                   >
                     {track.title}
                   </a>
                 ) : (
-                  <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]">
+                  <Text className="truncate text-sm font-semibold text-[rgb(var(--votuna-ink))]" title={track.title}>
                     {track.title}
                   </Text>
                 )}
@@ -92,6 +93,10 @@ export default function TracksSection({
             </div>
           )
         },
+        meta: {
+          headerClassName: 'w-[54%]',
+          cellClassName: 'max-w-0',
+        } satisfies AppDataTableColumnMeta,
       },
       {
         id: 'addedBy',
@@ -102,7 +107,10 @@ export default function TracksSection({
             {getAddedByLabel(row.original)}
           </Text>
         ),
-        meta: { cellClassName: 'align-top' } satisfies AppDataTableColumnMeta,
+        meta: {
+          headerClassName: 'w-[20%]',
+          cellClassName: 'align-top',
+        } satisfies AppDataTableColumnMeta,
       },
       {
         id: 'addedOn',
@@ -117,7 +125,10 @@ export default function TracksSection({
             {formatAddedDate(row.original.added_at)}
           </Text>
         ),
-        meta: { cellClassName: 'align-top' } satisfies AppDataTableColumnMeta,
+        meta: {
+          headerClassName: 'w-[16%]',
+          cellClassName: 'align-top',
+        } satisfies AppDataTableColumnMeta,
       },
       {
         id: 'actions',
@@ -170,7 +181,7 @@ export default function TracksSection({
           )
         },
         meta: {
-          headerClassName: 'text-right',
+          headerClassName: 'w-[10%] text-right',
           cellClassName: 'align-top',
         } satisfies AppDataTableColumnMeta,
       },

@@ -164,8 +164,8 @@ export default function AppDataTable<TData>({
         <Text className="text-sm text-[color:rgb(var(--votuna-ink)/0.6)]">{emptyMessage}</Text>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)]">
-            <Table className="min-w-full" aria-label={tableAriaLabel}>
+          <div className="overflow-hidden rounded-2xl border border-[color:rgb(var(--votuna-ink)/0.12)]">
+            <Table className="w-full table-fixed" aria-label={tableAriaLabel}>
               <TableHead className="bg-[rgba(var(--votuna-paper),0.75)]">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
