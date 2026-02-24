@@ -3,6 +3,7 @@ import { apiFetch, apiJson } from '@/lib/api'
 const MUSIC_KIT_SCRIPT_ID = 'apple-music-kit-sdk'
 const MUSIC_KIT_SCRIPT_SRC = 'https://js-cdn.music.apple.com/musickit/v1/musickit.js'
 export const APPLE_MUSICKIT_AUTO_CONNECT_KEY = 'votuna:apple-musickit:auto-connect'
+export const APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY = 'votuna:apple-musickit:pending-user-token'
 const MUSIC_KIT_SCRIPT_LOAD_TIMEOUT_MS = 15000
 const MUSIC_KIT_AUTHORIZE_TIMEOUT_MS = 20000
 
@@ -171,20 +172,36 @@ async function _authorizeMusicKitUser(config: AppleMusicKitConfig): Promise<stri
   return normalizedToken
 }
 
-export async function connectAppleMusicUserToken(): Promise<void> {
-  const config = await apiJson<AppleMusicKitConfig>('/api/v1/auth/apple/music-kit/config', {
-    authRequired: true,
+async function _fetchAppleMusicKitConfig(): Promise<AppleMusicKitConfig> {
+  return apiJson<AppleMusicKitConfig>('/api/v1/auth/apple/music-kit/public-config', {
+    authRequired: false,
   })
-  const musicUserToken = await _authorizeMusicKitUser(config)
+}
+
+export async function authorizeAppleMusicUserToken(): Promise<string> {
+  const config = await _fetchAppleMusicKitConfig()
+  return _authorizeMusicKitUser(config)
+}
+
+export async function syncAppleMusicUserToken(musicUserToken: string): Promise<void> {
+  const normalizedToken = (musicUserToken || '').trim()
+  if (!normalizedToken) {
+    throw new Error('Missing Apple Music user token to sync')
+  }
   const response = await apiFetch('/api/v1/auth/apple/music-user-token', {
     method: 'POST',
     authRequired: true,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ music_user_token: musicUserToken }),
+    body: JSON.stringify({ music_user_token: normalizedToken }),
   })
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
     const detail = typeof body.detail === 'string' ? body.detail : 'Failed to sync Apple Music authorization'
     throw new Error(detail)
   }
+}
+
+export async function connectAppleMusicUserToken(): Promise<void> {
+  const musicUserToken = await authorizeAppleMusicUserToken()
+  await syncAppleMusicUserToken(musicUserToken)
 }

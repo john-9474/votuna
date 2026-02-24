@@ -173,6 +173,24 @@ def test_callback_apple_post_creates_user_and_sets_cookie(client, db_session, mo
     assert user.email == "user@example.com"
 
 
+def test_callback_apple_post_does_not_store_sso_access_token(client, db_session, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
+    response = client.post(
+        "/api/v1/auth/callback/apple",
+        data={"code": "fake-code"},
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 307}
+
+    user = user_crud.get_by_provider_id(db_session, "apple", "sc-user")
+    assert user is not None
+    assert user.access_token is None
+    assert user.refresh_token is None
+    assert user.token_expires_at is None
+
+
 def test_callback_apple_post_provider_error_from_form(client, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 
@@ -306,6 +324,27 @@ def test_get_apple_music_kit_config_rejects_non_apple_user(auth_client):
     response = auth_client.get("/api/v1/auth/apple/music-kit/config")
     assert response.status_code == 400
     assert "Apple MusicKit config" in response.json()["detail"]
+
+
+def test_get_apple_music_kit_public_config_returns_developer_token(client, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    async def _fake_get_apple_music_developer_token() -> str:
+        return "dev-token-public"
+
+    monkeypatch.setattr(
+        auth_routes,
+        "get_apple_music_developer_token",
+        _fake_get_apple_music_developer_token,
+    )
+    monkeypatch.setattr(auth_routes, "get_apple_music_storefront", lambda: "us")
+
+    response = client.get("/api/v1/auth/apple/music-kit/public-config")
+    assert response.status_code == 200
+    assert response.json() == {
+        "developer_token": "dev-token-public",
+        "storefront": "us",
+    }
 
 
 def test_get_apple_music_kit_config_returns_developer_token(auth_client, db_session, user, monkeypatch):

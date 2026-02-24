@@ -7,7 +7,13 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import AppButton from '@/components/ui/AppButton'
 import LoginProviderDialog from '@/components/navbar/LoginProviderDialog'
-import { APPLE_MUSICKIT_AUTO_CONNECT_KEY, connectAppleMusicUserToken } from '@/lib/appleMusicKit'
+import {
+  APPLE_MUSICKIT_AUTO_CONNECT_KEY,
+  APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY,
+  authorizeAppleMusicUserToken,
+  connectAppleMusicUserToken,
+  syncAppleMusicUserToken,
+} from '@/lib/appleMusicKit'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import UserMenu from '@/components/navbar/UserMenu'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
@@ -33,7 +39,19 @@ export default function Navbar() {
   const user = userQuery.data ?? null
   const loading = userQuery.isLoading || userQuery.isFetching
   const { mutate: triggerAppleMusicAutoConnect, isPending: isAppleMusicAutoConnectPending } = useMutation({
-    mutationFn: connectAppleMusicUserToken,
+    mutationFn: async () => {
+      let pendingMusicUserToken = ''
+      try {
+        pendingMusicUserToken = (window.sessionStorage.getItem(APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY) || '').trim()
+      } catch {
+        pendingMusicUserToken = ''
+      }
+      if (pendingMusicUserToken) {
+        await syncAppleMusicUserToken(pendingMusicUserToken)
+        return
+      }
+      await connectAppleMusicUserToken()
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.providerPlaylistsRoot })
       queryClient.invalidateQueries({ queryKey: queryKeys.votunaPlaylists })
@@ -45,6 +63,7 @@ export default function Navbar() {
     onSettled: () => {
       try {
         window.sessionStorage.removeItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY)
+        window.sessionStorage.removeItem(APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY)
       } catch {
         // Ignore storage errors.
       }
@@ -103,12 +122,22 @@ export default function Navbar() {
   }
 
   /** Start the Apple Music OAuth flow. */
-  const handleAppleLogin = () => {
+  const handleAppleLogin = async () => {
     const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
     try {
       window.sessionStorage.setItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY, '1')
+      window.sessionStorage.removeItem(APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY)
     } catch {
       // Ignore storage errors.
+    }
+    try {
+      const musicUserToken = await authorizeAppleMusicUserToken()
+      if (musicUserToken.trim()) {
+        window.sessionStorage.setItem(APPLE_MUSICKIT_PENDING_USER_TOKEN_KEY, musicUserToken.trim())
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Apple MusicKit pre-login authorization error'
+      console.warn('Apple MusicKit pre-login authorization failed:', message)
     }
     window.location.href = `${API_URL}/api/v1/auth/login/apple?next=${encodeURIComponent(next)}`
   }

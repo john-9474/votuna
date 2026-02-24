@@ -277,7 +277,9 @@ async def _callback_provider(
         ):
             user = user_crud.update(db, user, {"avatar_url": None})
 
-    if access_token or refresh_token or expires_at:
+    # Apple Music APIs require a MusicKit user token, not Sign in with Apple OAuth tokens.
+    # Keep any previously synced MusicKit token and avoid overwriting it during Apple callback.
+    if provider is not AuthProvider.apple and (access_token or refresh_token or expires_at):
         updates: dict[str, Any] = {
             "token_expires_at": expires_at,
         }
@@ -389,6 +391,19 @@ async def callback_apple(
 ) -> Response:
     """Handle Apple's form_post callback and issue a session token."""
     return await _callback_provider(AuthProvider.apple, request, db)
+
+
+@router.get("/apple/music-kit/public-config", response_model=AppleMusicKitConfigOut)
+async def get_apple_music_kit_public_config() -> AppleMusicKitConfigOut:
+    """Return MusicKit frontend config for pre-login user-gesture authorization."""
+    try:
+        developer_token = await get_apple_music_developer_token()
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    return AppleMusicKitConfigOut(
+        developer_token=developer_token,
+        storefront=get_apple_music_storefront(),
+    )
 
 
 @router.get("/apple/music-kit/config", response_model=AppleMusicKitConfigOut)
