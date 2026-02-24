@@ -610,3 +610,15 @@ class AppleMusicProvider(MusicProviderClient):
             "Apple Music user lookup is not supported",
             status_code=501,
         )
+
+
+async def get_apple_music_developer_token() -> str:
+    """Return an Apple Music developer token using configured key material."""
+    provider = AppleMusicProvider(access_token="")
+    return await provider._get_developer_token()
+
+
+def get_apple_music_storefront() -> str:
+    """Return the configured Apple Music storefront with a safe default."""
+    storefront = (settings.APPLE_MUSIC_STOREFRONT or "us").strip()
+    return storefront or "us"

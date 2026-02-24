@@ -10,6 +10,10 @@ from alembic import context
 from dotenv import load_dotenv
 from app.db.session import Base
 
+# add your model's MetaData object here
+# for 'autogenerate' support
+from app.config.settings import settings
+
 # Load environment variables
 load_dotenv()
 
@@ -22,9 +26,6 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-from app.config.settings import settings
 
 target_metadata = Base.metadata
 logger = logging.getLogger("alembic.env")

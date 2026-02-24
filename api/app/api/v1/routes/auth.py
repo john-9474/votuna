@@ -1,5 +1,6 @@
 """Auth routes"""
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Mapping, cast
@@ -9,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user
 from app.auth.jwt import create_access_token
 from app.auth.sso import (
     AuthProvider,
@@ -22,7 +24,10 @@ from app.config.settings import settings
 from app.crud.user import user_crud
 from app.crud.user_settings import user_settings_crud
 from app.db.session import get_db
+from app.models.user import User
+from app.schemas.auth import AppleMusicKitConfigOut, AppleMusicUserTokenIn
 from app.services.music_providers import ProviderAPIError, ProviderAuthError, get_music_provider
+from app.services.music_providers.apple import get_apple_music_developer_token, get_apple_music_storefront
 from app.services.votuna_invites import join_invite_by_token
 from app.utils.avatar_storage import (
     delete_avatar_if_exists,
@@ -92,54 +97,85 @@ async def _fetch_soundcloud_permalink_url(
     return provider_user.profile_url
 
 
-@router.get("/login/{provider}")
-async def login_provider(
-    provider: AuthProvider,
-    invite_token: str | None = Query(default=None),
-    next_path: str = Query(default=None, alias="next"),
-) -> Response:
-    """Redirect the user to the provider's OAuth login flow."""
+async def _get_callback_form_values(request: Request) -> dict[str, str]:
+    """Read callback form fields for providers that return response_mode=form_post."""
+    if request.method.upper() != "POST":
+        return {}
     try:
-        sso: SSOProtocol = get_sso(provider)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    async with sso:
-        response = await sso.get_login_redirect()
-    if invite_token:
-        response.set_cookie(
-            PENDING_INVITE_COOKIE,
-            invite_token,
-            httponly=True,
-            secure=settings.AUTH_COOKIE_SECURE,
-            samesite=settings.AUTH_COOKIE_SAMESITE,
-            max_age=PENDING_CONTEXT_MAX_AGE,
-        )
-    else:
-        response.delete_cookie(PENDING_INVITE_COOKIE)
+        form = await request.form()
+    except Exception:
+        return {}
 
-    if _is_safe_next_path(next_path):
-        response.set_cookie(
-            PENDING_NEXT_COOKIE,
-            next_path,
-            httponly=True,
-            secure=settings.AUTH_COOKIE_SECURE,
-            samesite=settings.AUTH_COOKIE_SAMESITE,
-            max_age=PENDING_CONTEXT_MAX_AGE,
-        )
-    else:
-        response.delete_cookie(PENDING_NEXT_COOKIE)
-    return response
+    values: dict[str, str] = {}
+    for key, value in form.multi_items():
+        if isinstance(value, str) and key not in values:
+            values[key] = value
+    return values
 
 
-@router.get("/callback/{provider}")
-async def callback_provider(
+def _extract_apple_user_fallback(form_values: Mapping[str, str]) -> dict[str, str | None]:
+    """Return Apple first-login profile fields from the optional callback `user` payload."""
+    raw_user = (form_values.get("user") or "").strip()
+    if not raw_user:
+        return {
+            "email": None,
+            "first_name": None,
+            "last_name": None,
+            "display_name": None,
+        }
+
+    try:
+        payload = json.loads(raw_user)
+    except (json.JSONDecodeError, TypeError):
+        return {
+            "email": None,
+            "first_name": None,
+            "last_name": None,
+            "display_name": None,
+        }
+
+    if not isinstance(payload, dict):
+        return {
+            "email": None,
+            "first_name": None,
+            "last_name": None,
+            "display_name": None,
+        }
+
+    email = payload.get("email")
+    email_value = email.strip() if isinstance(email, str) and email.strip() else None
+
+    name = payload.get("name")
+    if not isinstance(name, dict):
+        return {
+            "email": email_value,
+            "first_name": None,
+            "last_name": None,
+            "display_name": None,
+        }
+
+    first_name = name.get("firstName")
+    first_name_value = first_name.strip() if isinstance(first_name, str) and first_name.strip() else None
+    last_name = name.get("lastName")
+    last_name_value = last_name.strip() if isinstance(last_name, str) and last_name.strip() else None
+    display_name = " ".join(part for part in [first_name_value, last_name_value] if part) or None
+    return {
+        "email": email_value,
+        "first_name": first_name_value,
+        "last_name": last_name_value,
+        "display_name": display_name,
+    }
+
+
+async def _callback_provider(
     provider: AuthProvider,
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session,
 ) -> Response:
-    """Handle the OAuth callback, issue a session token, and redirect."""
-    provider_error = request.query_params.get("error")
-    provider_error_description = request.query_params.get("error_description")
+    """Handle provider callback, issue a session token, and redirect."""
+    form_values = await _get_callback_form_values(request)
+    provider_error = request.query_params.get("error") or form_values.get("error")
+    provider_error_description = request.query_params.get("error_description") or form_values.get("error_description")
     if provider_error:
         message = provider_error_description or provider_error
         logger.warning(
@@ -175,6 +211,13 @@ async def callback_provider(
     last_name = get_openid_value(openid, "last_name")
     display_name = get_openid_value(openid, *provider_config.display_name_keys)
     provider_avatar_url = get_openid_value(openid, *provider_config.avatar_keys)
+
+    if provider is AuthProvider.apple:
+        apple_user_fallback = _extract_apple_user_fallback(form_values)
+        email = email or apple_user_fallback["email"]
+        first_name = first_name or apple_user_fallback["first_name"]
+        last_name = last_name or apple_user_fallback["last_name"]
+        display_name = display_name or apple_user_fallback["display_name"]
 
     provider_user_id_str = str(provider_user_id)
     provider_permalink_url = None
@@ -288,6 +331,115 @@ async def callback_provider(
     redirect_response.delete_cookie(PENDING_INVITE_COOKIE)
     redirect_response.delete_cookie(PENDING_NEXT_COOKIE)
     return redirect_response
+
+
+@router.get("/login/{provider}")
+async def login_provider(
+    provider: AuthProvider,
+    invite_token: str | None = Query(default=None),
+    next_path: str = Query(default=None, alias="next"),
+) -> Response:
+    """Redirect the user to the provider's OAuth login flow."""
+    try:
+        sso: SSOProtocol = get_sso(provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+    async with sso:
+        response = await sso.get_login_redirect()
+    if invite_token:
+        response.set_cookie(
+            PENDING_INVITE_COOKIE,
+            invite_token,
+            httponly=True,
+            secure=settings.AUTH_COOKIE_SECURE,
+            samesite=settings.AUTH_COOKIE_SAMESITE,
+            max_age=PENDING_CONTEXT_MAX_AGE,
+        )
+    else:
+        response.delete_cookie(PENDING_INVITE_COOKIE)
+
+    if _is_safe_next_path(next_path):
+        response.set_cookie(
+            PENDING_NEXT_COOKIE,
+            next_path,
+            httponly=True,
+            secure=settings.AUTH_COOKIE_SECURE,
+            samesite=settings.AUTH_COOKIE_SAMESITE,
+            max_age=PENDING_CONTEXT_MAX_AGE,
+        )
+    else:
+        response.delete_cookie(PENDING_NEXT_COOKIE)
+    return response
+
+
+@router.get("/callback/{provider}")
+async def callback_provider(
+    provider: AuthProvider,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Handle the OAuth callback, issue a session token, and redirect."""
+    return await _callback_provider(provider, request, db)
+
+
+@router.post("/callback/apple")
+async def callback_apple(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Handle Apple's form_post callback and issue a session token."""
+    return await _callback_provider(AuthProvider.apple, request, db)
+
+
+@router.get("/apple/music-kit/config", response_model=AppleMusicKitConfigOut)
+async def get_apple_music_kit_config(
+    current_user: User = Depends(get_current_user),
+) -> AppleMusicKitConfigOut:
+    """Return MusicKit frontend config for an Apple-authenticated user."""
+    if current_user.auth_provider != AuthProvider.apple.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Apple MusicKit config is only available for Apple-authenticated users",
+        )
+    try:
+        developer_token = await get_apple_music_developer_token()
+    except ProviderAPIError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+    return AppleMusicKitConfigOut(
+        developer_token=developer_token,
+        storefront=get_apple_music_storefront(),
+    )
+
+
+@router.post("/apple/music-user-token", status_code=status.HTTP_204_NO_CONTENT)
+async def set_apple_music_user_token(
+    payload: AppleMusicUserTokenIn,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Persist a MusicKit user token for Apple Music API requests."""
+    if current_user.auth_provider != AuthProvider.apple.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MusicKit token sync is only available for Apple-authenticated users",
+        )
+
+    music_user_token = payload.music_user_token.strip()
+    if not music_user_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="MusicKit user token is required",
+        )
+
+    user_crud.update(
+        db,
+        current_user,
+        {
+            "access_token": music_user_token,
+            "token_expires_at": None,
+        },
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/logout")

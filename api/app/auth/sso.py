@@ -18,6 +18,7 @@ from app.config.settings import settings
 APPLE_SCOPES = [
     "openid",
     "email",
+    "name",
 ]
 
 SPOTIFY_SCOPES = [

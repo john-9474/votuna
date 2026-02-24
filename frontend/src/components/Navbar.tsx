@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import AppButton from '@/components/ui/AppButton'
 import LoginProviderDialog from '@/components/navbar/LoginProviderDialog'
+import { APPLE_MUSICKIT_AUTO_CONNECT_KEY } from '@/lib/appleMusicKit'
 import UserMenu from '@/components/navbar/UserMenu'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { User } from '@/lib/types/user'
@@ -58,6 +59,11 @@ export default function Navbar() {
   /** Start the Apple Music OAuth flow. */
   const handleAppleLogin = () => {
     const next = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    try {
+      window.sessionStorage.setItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY, '1')
+    } catch {
+      // Ignore storage errors; fallback manual connect remains available.
+    }
     window.location.href = `${API_URL}/api/v1/auth/login/apple?next=${encodeURIComponent(next)}`
   }
 

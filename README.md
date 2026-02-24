@@ -3,15 +3,14 @@
 Votuna is an open source collaborative playlist voting app.
 
 Current provider status:
-- Frontend login: Spotify, SoundCloud, and TIDAL
+- Frontend login: Spotify, SoundCloud, Apple Music, and TIDAL
 - Backend auth/provider clients: Spotify, SoundCloud, Apple Music, and TIDAL
-- Apple Music frontend login is temporarily disabled while the auth flow is finalized
 
 ## Current Feature Status
 
 ### Implemented
-- Spotify, SoundCloud, and TIDAL OAuth login with cookie-based sessions
-- Apple Music OAuth + provider client integration in backend (frontend login currently disabled)
+- Spotify, SoundCloud, Apple Music, and TIDAL OAuth login with cookie-based sessions
+- Apple Music OAuth + provider client integration in backend
 - Provider clients for Spotify, SoundCloud, Apple Music, and TIDAL (playlist + track APIs; TIDAL refresh token handling)
 - Dashboard to:
   - List provider playlists
@@ -40,7 +39,7 @@ Current provider status:
 
 ### Planned / In Progress
 - Provider polish:
-  - Re-enable Apple Music login in the frontend once auth flow hardening is complete
+  - Continue hardening Apple Music login and callback UX
   - Broaden recommendation support where provider APIs are reliable
   - Cross-provider playlist links and metadata sync
 - Playlist management tools:
@@ -91,9 +90,9 @@ At minimum set:
 - At least one provider OAuth set:
   - `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SPOTIFY_REDIRECT_URI`
   - `SOUNDCLOUD_CLIENT_ID`, `SOUNDCLOUD_CLIENT_SECRET`, `SOUNDCLOUD_REDIRECT_URI`
+  - `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`, `APPLE_REDIRECT_URI`
   - `TIDAL_CLIENT_ID`, `TIDAL_CLIENT_SECRET`, `TIDAL_REDIRECT_URI`
 - Optional provider settings:
-  - `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`, `APPLE_REDIRECT_URI`
   - `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_PRIVATE_KEY`
   - `APPLE_MUSIC_DEVELOPER_TOKEN` (or signing key settings above), `APPLE_MUSIC_STOREFRONT`
   - `TIDAL_COUNTRY_CODE`
@@ -153,6 +152,55 @@ If needed, create `frontend/.env.local`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
+
+### Apple local auth with fixed ngrok domain
+
+Apple Sign In callbacks must be HTTPS and cannot use `localhost`. For low-friction local testing:
+
+1. Reserve an ngrok domain and register it in Apple Developer as:
+   - `https://<reserved-ngrok-domain>/api/v1/auth/callback/apple`
+2. Set these values once in root `.env`:
+   - `APPLE_REDIRECT_URI=https://<reserved-ngrok-domain>/api/v1/auth/callback/apple`
+   - `NEXT_PUBLIC_API_URL=https://<reserved-ngrok-domain>`
+   - `AUTH_COOKIE_SECURE=True`
+   - `AUTH_COOKIE_SAMESITE=none`
+   - Keep `FRONTEND_URL=http://localhost:3000`
+   - Keep `ALLOWED_ORIGINS` including `http://localhost:3000`
+3. Generate `APPLE_CLIENT_SECRET` once and store it in `.env` (rotate before expiry).
+4. Start ngrok locally against the API port:
+
+```bash
+ngrok config add-authtoken <token>
+ngrok http --domain=<reserved-ngrok-domain> 8000
+```
+
+Generate/update `APPLE_CLIENT_SECRET` with the helper script:
+
+```bash
+python scripts/generate_apple_tokens.py \
+  --token-type client-secret \
+  --team-id <apple-team-id> \
+  --key-id <apple-signin-key-id> \
+  --client-id <apple-client-id> \
+  --private-key-path <path-to-AuthKey_XXXXXX.p8> \
+  --write-env
+```
+
+Generate/update `APPLE_MUSIC_DEVELOPER_TOKEN` with the same helper script:
+
+```bash
+python scripts/generate_apple_tokens.py \
+  --token-type music-developer \
+  --team-id <apple-team-id> \
+  --key-id <apple-musickit-key-id> \
+  --private-key-path <path-to-AuthKey_XXXXXX.p8> \
+  --write-env
+```
+
+Notes:
+- `--client-id` is used as JWT `sub` and must match your Apple OAuth `client_id` (usually Services ID for web flows).
+- `--app-id` can be supplied as an alias; if `--client-id` is omitted the script uses `--app-id`.
+- The script enforces Apple's max client-secret lifetime and prints expiry in UTC.
 
 ## Deploy to Railway
 
@@ -244,10 +292,12 @@ This keeps uploaded avatar files across deploys.
    - `<url>/api/v1/auth/callback/spotify`
 6. In SoundCloud developer settings, set callback URL to:
    - `<url>/api/v1/auth/callback/soundcloud`
-7. In TIDAL developer settings, set callback URL to:
+7. In Apple developer settings, set callback URL to:
+   - `<url>/api/v1/auth/callback/apple`
+8. In TIDAL developer settings, set callback URL to:
    - `<url>/api/v1/auth/callback/tidal`
-8. Ensure provider redirect URIs match exactly, then redeploy `api`.
-9. After bootstrap, use GitHub Releases for production deploys:
+9. Ensure provider redirect URIs match exactly, then redeploy `api`.
+10. After bootstrap, use GitHub Releases for production deploys:
    - Publish a non-prerelease GitHub Release.
    - GitHub Actions runs quality checks, then deploys both Railway services.
 
@@ -255,7 +305,7 @@ This keeps uploaded avatar files across deploys.
 
 - API health: `GET /health` returns healthy.
 - Frontend loads and can fetch authenticated user state.
-- Spotify/SoundCloud/TIDAL login redirects back to app and sets auth cookie.
+- Spotify/SoundCloud/Apple Music/TIDAL login redirects back to app and sets auth cookie.
 - Playlist listing/details load.
 - Suggest/add/vote flows work.
 - Upload avatar, redeploy API, verify avatar still exists.
@@ -306,5 +356,4 @@ docker compose --profile test up --build api_tests
 
 - Root `.env` is used by both Docker Compose and backend settings loading.
 - In local development, ensure `ALLOWED_ORIGINS` includes your frontend host.
-- Frontend login buttons currently expose Spotify, SoundCloud, and TIDAL.
-- Apple Music auth/provider flow is available in backend routes but frontend login is temporarily disabled.
+- Frontend login buttons expose Spotify, SoundCloud, Apple Music, and TIDAL.

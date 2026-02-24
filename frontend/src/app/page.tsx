@@ -2,7 +2,8 @@
 
 import { Col, Grid, Text } from '@tremor/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { APPLE_MUSICKIT_AUTO_CONNECT_KEY, connectAppleMusicUserToken } from '@/lib/appleMusicKit'
 import { queryKeys } from '@/lib/constants/queryKeys'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { getProviderPlaylistUrl } from '@/lib/providerLinks'
@@ -48,8 +49,8 @@ const getProviderLabel = (provider: string | null | undefined) => {
 /** Landing page hero content. */
 function Landing() {
   const statusItems = [
-    'Spotify, SoundCloud, and TIDAL login',
-    'Apple Music backend auth/provider integration (frontend login temporarily disabled)',
+    'Spotify, SoundCloud, Apple Music, and TIDAL login',
+    'Apple Music OAuth + provider integration',
     'Create playlists (public or private)',
     'Enable existing provider playlists for voting',
     'Search tracks and suggest by link',
@@ -108,7 +109,7 @@ function Landing() {
   ]
 
   const workflowSteps = [
-    'Log in with Spotify, SoundCloud, or TIDAL.',
+    'Log in with Spotify, SoundCloud, Apple Music, or TIDAL.',
     'Create or enable a playlist on your dashboard.',
     'Invite people to suggest tracks and vote.',
     'Use the Manage tab to import/export tracks with preview before execution.',
@@ -118,7 +119,7 @@ function Landing() {
     {
       title: 'Provider roadmap',
       items: [
-        'Re-enable Apple Music login in the frontend once auth flow hardening is complete',
+        'Continue hardening Apple Music login and callback UX',
         'Broaden recommendation support where provider APIs allow it',
         'Cross-provider playlist links and metadata sync',
       ],
@@ -153,7 +154,7 @@ function Landing() {
               Alpha
             </div>
             <h1 className="text-5xl font-semibold tracking-tight text-[rgb(var(--votuna-ink))] sm:text-6xl">
-              Open source playlist voting for Spotify, SoundCloud, and TIDAL.
+              Open source playlist voting for Spotify, SoundCloud, Apple Music, and TIDAL.
             </h1>
             <Text className="text-lg text-[color:rgb(var(--votuna-ink)/0.7)] sm:text-xl">
               Votuna helps groups suggest tracks, vote together, and manage what gets added next.
@@ -170,7 +171,7 @@ function Landing() {
                 Next.js frontend
               </span>
               <span className="rounded-full border border-[color:rgb(var(--votuna-ink)/0.1)] bg-[rgba(var(--votuna-paper),0.7)] px-4 py-2">
-                Spotify, SoundCloud, and TIDAL support
+                Spotify, SoundCloud, Apple Music, and TIDAL support
               </span>
             </div>
           </Col>
@@ -265,13 +266,27 @@ export default function Home() {
   const [newPlaylistIsPublic, setNewPlaylistIsPublic] = useState(false)
   const [playlistActionError, setPlaylistActionError] = useState('')
   const [inviteActionError, setInviteActionError] = useState('')
+  const [appleMusicAutoConnectRequested, setAppleMusicAutoConnectRequested] = useState(false)
+  const [appleMusicConnectError, setAppleMusicConnectError] = useState('')
+  const [appleMusicConnectSuccess, setAppleMusicConnectSuccess] = useState(false)
   const [enabling, setEnabling] = useState<Record<string, boolean>>({})
   const [pendingInviteActions, setPendingInviteActions] = useState<Record<number, 'accept' | 'decline'>>({})
+  const appleMusicAutoConnectAttemptedRef = useRef(false)
 
   const userQuery = useCurrentUser()
   const user = userQuery.data ?? null
   const activeProvider = useMemo(() => (user?.auth_provider || 'soundcloud').toLowerCase(), [user?.auth_provider])
   const activeProviderLabel = useMemo(() => getProviderLabel(activeProvider), [activeProvider])
+  const isAppleProvider = activeProvider === 'apple'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      setAppleMusicAutoConnectRequested(window.sessionStorage.getItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY) === '1')
+    } catch {
+      setAppleMusicAutoConnectRequested(false)
+    }
+  }, [])
 
   const providerQuery = useQuery({
     queryKey: queryKeys.providerPlaylistsByProvider(activeProvider),
@@ -316,6 +331,46 @@ export default function Home() {
     () => votunaPlaylists.filter((playlist) => playlist.owner_user_id !== user?.id),
     [votunaPlaylists, user?.id],
   )
+
+  const connectAppleMusicMutation = useMutation({
+    mutationFn: connectAppleMusicUserToken,
+    onMutate: () => {
+      setAppleMusicConnectError('')
+      setAppleMusicConnectSuccess(false)
+    },
+    onSuccess: () => {
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY)
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+      setAppleMusicAutoConnectRequested(false)
+      setAppleMusicConnectSuccess(true)
+      queryClient.invalidateQueries({ queryKey: queryKeys.providerPlaylistsRoot })
+      queryClient.invalidateQueries({ queryKey: queryKeys.votunaPlaylists })
+    },
+    onError: (error) => {
+      if (typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY)
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+      setAppleMusicAutoConnectRequested(false)
+      const message = error instanceof Error ? error.message : 'Unable to connect Apple Music'
+      setAppleMusicConnectError(message)
+    },
+  })
+
+  useEffect(() => {
+    if (!isAppleProvider || !appleMusicAutoConnectRequested) return
+    if (appleMusicAutoConnectAttemptedRef.current) return
+    appleMusicAutoConnectAttemptedRef.current = true
+    connectAppleMusicMutation.mutate()
+  }, [isAppleProvider, appleMusicAutoConnectRequested, connectAppleMusicMutation])
 
   const clearPendingInviteAction = (inviteId: number) => {
     setPendingInviteActions((prev) => {
@@ -456,6 +511,15 @@ export default function Home() {
   const playlistQueryError = (providerQuery.error || votunaQuery.error) as ApiError | null
   const playlistQueryErrorMessage = playlistQueryError?.detail || playlistQueryError?.message || ''
   const playlistErrorMessage = playlistActionError || playlistQueryErrorMessage
+  const shouldShowAppleMusicConnect =
+    isAppleProvider &&
+    (appleMusicAutoConnectRequested ||
+      connectAppleMusicMutation.isPending ||
+      !!appleMusicConnectError ||
+      !!appleMusicConnectSuccess ||
+      playlistQueryErrorMessage.toLowerCase().includes('authorization expired or invalid') ||
+      playlistQueryErrorMessage.toLowerCase().includes('apple music user token') ||
+      playlistQueryErrorMessage.toLowerCase().includes('missing provider access token'))
   const pendingInvitesQueryError = pendingInvitesQuery.error as ApiError | null
   const pendingInvitesErrorMessage =
     inviteActionError || pendingInvitesQueryError?.detail || pendingInvitesQueryError?.message || ''
@@ -467,6 +531,40 @@ export default function Home() {
     <main className="mx-auto w-full max-w-6xl px-6 py-6">
       <div className="fade-up space-y-8">
         <AppSectionHeader eyebrow="Dashboard" title="Playlist dashboard" />
+
+        {shouldShowAppleMusicConnect ? (
+          <SurfaceCard>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <SectionEyebrow>Apple MusicKit</SectionEyebrow>
+                <Text className="mt-2 text-sm text-[color:rgb(var(--votuna-ink)/0.7)]">
+                  Connect your Apple Music library once so Votuna can read and manage your Apple playlists.
+                </Text>
+              </div>
+              <AppButton
+                onClick={() => connectAppleMusicMutation.mutate()}
+                disabled={connectAppleMusicMutation.isPending}
+              >
+                {connectAppleMusicMutation.isPending ? 'Connecting...' : 'Connect Apple Music'}
+              </AppButton>
+            </div>
+            {connectAppleMusicMutation.isPending ? (
+              <StatusCallout tone="info" title="Apple MusicKit" className="mt-4">
+                Finalizing Apple Music connection...
+              </StatusCallout>
+            ) : null}
+            {appleMusicConnectError ? (
+              <StatusCallout tone="error" title="Apple MusicKit" className="mt-4">
+                {appleMusicConnectError}
+              </StatusCallout>
+            ) : null}
+            {appleMusicConnectSuccess ? (
+              <StatusCallout tone="success" title="Apple MusicKit" className="mt-4">
+                Apple Music connected. You can now load your Apple playlists.
+              </StatusCallout>
+            ) : null}
+          </SurfaceCard>
+        ) : null}
 
         <SurfaceCard>
           <div className="flex flex-wrap items-center justify-between gap-4">

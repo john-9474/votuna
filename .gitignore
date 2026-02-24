@@ -155,3 +155,6 @@ api/user_files/
 
 # Test files
 api/user_files_test/
+
+# Keys
+*.p8

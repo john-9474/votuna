@@ -1,3 +1,5 @@
+import json
+
 from fastapi.responses import RedirectResponse
 import pytest
 
@@ -55,6 +57,27 @@ class DummyNumericOpenID(DummyOpenID):
 class DummyNumericSSO(DummySSO):
     async def verify_and_process(self, request, **kwargs):
         return DummyNumericOpenID()
+
+
+class DummyAppleSparseOpenID:
+    id = "apple-fallback-user"
+    sub = None
+    email = None
+    first_name = None
+    last_name = None
+    name = None
+    display_name = None
+    picture = None
+    avatar_url = None
+    username = None
+
+    def model_dump(self):
+        return {"id": self.id}
+
+
+class DummyAppleSparseSSO(DummySSO):
+    async def verify_and_process(self, request, **kwargs):
+        return DummyAppleSparseOpenID()
 
 
 @pytest.mark.parametrize("provider", ["soundcloud", "spotify", "apple", "tidal"])
@@ -131,6 +154,65 @@ def test_callback_soundcloud_syncs_permalink_url(client, db_session, monkeypatch
     user = user_crud.get_by_provider_id(db_session, "soundcloud", "243633184")
     assert user is not None
     assert user.permalink_url == "https://soundcloud.com/john-thorlby-335768329"
+
+
+def test_callback_apple_post_creates_user_and_sets_cookie(client, db_session, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummySSO())
+    response = client.post(
+        "/api/v1/auth/callback/apple",
+        data={"code": "fake-code"},
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 307}
+    assert settings.AUTH_COOKIE_NAME in response.headers.get("set-cookie", "")
+
+    user = user_crud.get_by_provider_id(db_session, "apple", "sc-user")
+    assert user is not None
+    assert user.email == "user@example.com"
+
+
+def test_callback_apple_post_provider_error_from_form(client, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: pytest.fail("get_sso should not be called"))
+    response = client.post(
+        "/api/v1/auth/callback/apple",
+        data={"error": "access_denied", "error_description": "User canceled"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "User canceled"
+
+
+def test_callback_apple_post_uses_user_payload_fallback(client, db_session, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    monkeypatch.setattr(auth_routes, "get_sso", lambda provider: DummyAppleSparseSSO())
+    response = client.post(
+        "/api/v1/auth/callback/apple",
+        data={
+            "code": "fake-code",
+            "user": json.dumps(
+                {
+                    "name": {
+                        "firstName": "Apple",
+                        "lastName": "Tester",
+                    },
+                    "email": "apple@example.com",
+                }
+            ),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code in {302, 307}
+
+    user = user_crud.get_by_provider_id(db_session, "apple", "apple-fallback-user")
+    assert user is not None
+    assert user.email == "apple@example.com"
+    assert user.first_name == "Apple"
+    assert user.last_name == "Tester"
+    assert user.display_name == "Apple Tester"
 
 
 def test_callback_auto_joins_invite_and_redirects_to_playlist(
@@ -218,6 +300,66 @@ def test_callback_does_not_auto_accept_targeted_invites_without_invite_context(
     assert refreshed_invite.accepted_by_user_id is None
     assert refreshed_invite.uses_count == 0
     assert refreshed_invite.is_revoked is False
+
+
+def test_get_apple_music_kit_config_rejects_non_apple_user(auth_client):
+    response = auth_client.get("/api/v1/auth/apple/music-kit/config")
+    assert response.status_code == 400
+    assert "Apple MusicKit config" in response.json()["detail"]
+
+
+def test_get_apple_music_kit_config_returns_developer_token(auth_client, db_session, user, monkeypatch):
+    import app.api.v1.routes.auth as auth_routes
+
+    user_crud.update(db_session, user, {"auth_provider": "apple"})
+
+    async def _fake_get_apple_music_developer_token() -> str:
+        return "dev-token"
+
+    monkeypatch.setattr(
+        auth_routes,
+        "get_apple_music_developer_token",
+        _fake_get_apple_music_developer_token,
+    )
+    monkeypatch.setattr(auth_routes, "get_apple_music_storefront", lambda: "us")
+
+    response = auth_client.get("/api/v1/auth/apple/music-kit/config")
+    assert response.status_code == 200
+    assert response.json() == {
+        "developer_token": "dev-token",
+        "storefront": "us",
+    }
+
+
+def test_set_apple_music_user_token_rejects_non_apple_user(auth_client):
+    response = auth_client.post(
+        "/api/v1/auth/apple/music-user-token",
+        json={"music_user_token": "music-user-token"},
+    )
+    assert response.status_code == 400
+    assert "MusicKit token sync" in response.json()["detail"]
+
+
+def test_set_apple_music_user_token_persists_token(auth_client, db_session, user):
+    user_crud.update(
+        db_session,
+        user,
+        {
+            "auth_provider": "apple",
+            "access_token": "legacy-token",
+        },
+    )
+
+    response = auth_client.post(
+        "/api/v1/auth/apple/music-user-token",
+        json={"music_user_token": "music-user-token"},
+    )
+    assert response.status_code == 204
+
+    refreshed = user_crud.get(db_session, user.id)
+    assert refreshed is not None
+    assert refreshed.access_token == "music-user-token"
+    assert refreshed.token_expires_at is None
 
 
 def test_logout_clears_cookie(client):

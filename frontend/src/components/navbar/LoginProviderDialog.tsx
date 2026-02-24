@@ -54,11 +54,9 @@ export default function LoginProviderDialog({
           <AppButton
             intent="secondary"
             onClick={onAppleLogin}
-            disabled
             className="w-full justify-center rounded-2xl"
-            title="Apple Music login is temporarily disabled"
           >
-            Continue with Apple Music (Temporarily disabled)
+            Continue with Apple Music
           </AppButton>
           <AppButton intent="secondary" onClick={onTidalLogin} className="w-full justify-center rounded-2xl">
             Continue with TIDAL

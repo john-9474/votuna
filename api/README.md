@@ -12,7 +12,7 @@ FastAPI backend for Votuna's collaborative playlist workflows.
 - Playlist management transfer endpoints (import/export with preview and execute)
 
 Runtime provider client support includes **Spotify**, **SoundCloud**, **Apple Music**, and **TIDAL** (`get_music_provider`).
-Frontend currently exposes login buttons for Spotify, SoundCloud, and TIDAL; Apple login is intentionally disabled in UI for now.
+Frontend login supports Spotify, SoundCloud, Apple Music, and TIDAL.
 
 ## Playlist Management (Implemented)
 
@@ -96,6 +96,9 @@ Required values:
   - `SOUNDCLOUD_CLIENT_ID`
   - `SOUNDCLOUD_CLIENT_SECRET`
   - `SOUNDCLOUD_REDIRECT_URI`
+  - `APPLE_CLIENT_ID`
+  - `APPLE_CLIENT_SECRET`
+  - `APPLE_REDIRECT_URI`
   - `TIDAL_CLIENT_ID`
   - `TIDAL_CLIENT_SECRET`
   - `TIDAL_REDIRECT_URI`
