@@ -326,27 +326,6 @@ def test_get_apple_music_kit_config_rejects_non_apple_user(auth_client):
     assert "Apple MusicKit config" in response.json()["detail"]
 
 
-def test_get_apple_music_kit_public_config_returns_developer_token(client, monkeypatch):
-    import app.api.v1.routes.auth as auth_routes
-
-    async def _fake_get_apple_music_developer_token() -> str:
-        return "dev-token-public"
-
-    monkeypatch.setattr(
-        auth_routes,
-        "get_apple_music_developer_token",
-        _fake_get_apple_music_developer_token,
-    )
-    monkeypatch.setattr(auth_routes, "get_apple_music_storefront", lambda: "us")
-
-    response = client.get("/api/v1/auth/apple/music-kit/public-config")
-    assert response.status_code == 200
-    assert response.json() == {
-        "developer_token": "dev-token-public",
-        "storefront": "us",
-    }
-
-
 def test_get_apple_music_kit_config_returns_developer_token(auth_client, db_session, user, monkeypatch):
     import app.api.v1.routes.auth as auth_routes
 

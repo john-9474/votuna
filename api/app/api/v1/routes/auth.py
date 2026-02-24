@@ -393,19 +393,6 @@ async def callback_apple(
     return await _callback_provider(AuthProvider.apple, request, db)
 
 
-@router.get("/apple/music-kit/public-config", response_model=AppleMusicKitConfigOut)
-async def get_apple_music_kit_public_config() -> AppleMusicKitConfigOut:
-    """Return MusicKit frontend config for pre-login user-gesture authorization."""
-    try:
-        developer_token = await get_apple_music_developer_token()
-    except ProviderAPIError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
-    return AppleMusicKitConfigOut(
-        developer_token=developer_token,
-        storefront=get_apple_music_storefront(),
-    )
-
-
 @router.get("/apple/music-kit/config", response_model=AppleMusicKitConfigOut)
 async def get_apple_music_kit_config(
     current_user: User = Depends(get_current_user),
