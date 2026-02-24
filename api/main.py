@@ -89,9 +89,7 @@ def _log_apple_signin_runtime_diagnostics() -> None:
 
     payload = _decode_jwt_payload_without_verification(client_secret)
     if payload is None:
-        logger.warning(
-            "Apple Sign In runtime | unable to decode APPLE_CLIENT_SECRET payload for diagnostics"
-        )
+        logger.warning("Apple Sign In runtime | unable to decode APPLE_CLIENT_SECRET payload for diagnostics")
         return
 
     iss = payload.get("iss")
@@ -129,13 +127,9 @@ def _log_apple_signin_runtime_diagnostics() -> None:
     if not redirect_uri:
         logger.error("Apple Sign In runtime mismatch | APPLE_REDIRECT_URI is missing")
     if not sub_matches_client_id:
-        logger.error(
-            "Apple Sign In runtime mismatch | APPLE_CLIENT_ID must exactly match APPLE_CLIENT_SECRET sub"
-        )
+        logger.error("Apple Sign In runtime mismatch | APPLE_CLIENT_ID must exactly match APPLE_CLIENT_SECRET sub")
     if not aud_valid:
-        logger.error(
-            "Apple Sign In runtime mismatch | APPLE_CLIENT_SECRET aud must be https://appleid.apple.com"
-        )
+        logger.error("Apple Sign In runtime mismatch | APPLE_CLIENT_SECRET aud must be https://appleid.apple.com")
     if expired:
         logger.error("Apple Sign In runtime mismatch | APPLE_CLIENT_SECRET is expired")
 
