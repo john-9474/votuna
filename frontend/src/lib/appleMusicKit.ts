@@ -102,12 +102,7 @@ async function _ensureMusicKitReady(): Promise<MusicKitNamespace> {
 
       const script = document.getElementById(MUSIC_KIT_SCRIPT_ID) as HTMLScriptElement | null
       if (script) {
-        if (script.dataset.loaded === '1') {
-          onReady()
-          return
-        }
-        const readyState = script.readyState
-        if (readyState === 'complete' || readyState === 'loaded') {
+        if (script.dataset.loaded === '1' || _readMusicKitFromWindow()) {
           script.dataset.loaded = '1'
           onReady()
           return
@@ -167,7 +162,7 @@ async function _authorizeMusicKitUser(config: AppleMusicKitConfig): Promise<stri
   const authorizedToken = await _withTimeout(
     instance.authorize(),
     MUSIC_KIT_AUTHORIZE_TIMEOUT_MS,
-    'Apple Music authorization timed out. Click Connect Apple Music to continue.',
+    'Apple Music authorization timed out. Please try logging in with Apple again.',
   )
   const normalizedToken = typeof authorizedToken === 'string' ? authorizedToken.trim() : ''
   if (!normalizedToken) {
