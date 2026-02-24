@@ -1,13 +1,14 @@
 'use client'
 
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppButton from '@/components/ui/AppButton'
 import LoginProviderDialog from '@/components/navbar/LoginProviderDialog'
-import { APPLE_MUSICKIT_AUTO_CONNECT_KEY } from '@/lib/appleMusicKit'
+import { APPLE_MUSICKIT_AUTO_CONNECT_KEY, connectAppleMusicUserToken } from '@/lib/appleMusicKit'
+import { queryKeys } from '@/lib/constants/queryKeys'
 import UserMenu from '@/components/navbar/UserMenu'
 import { currentUserQueryKey, useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { User } from '@/lib/types/user'
@@ -27,9 +28,28 @@ export default function Navbar() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [loginOpen, setLoginOpen] = useState(false)
+  const appleMusicAutoConnectAttemptedRef = useRef(false)
   const userQuery = useCurrentUser()
   const user = userQuery.data ?? null
   const loading = userQuery.isLoading || userQuery.isFetching
+  const { mutate: triggerAppleMusicAutoConnect, isPending: isAppleMusicAutoConnectPending } = useMutation({
+    mutationFn: connectAppleMusicUserToken,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.providerPlaylistsRoot })
+      queryClient.invalidateQueries({ queryKey: queryKeys.votunaPlaylists })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Unknown Apple MusicKit connection error"
+      console.warn("Apple MusicKit auto-connect failed:", message)
+    },
+    onSettled: () => {
+      try {
+        window.sessionStorage.removeItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY)
+      } catch {
+        // Ignore storage errors.
+      }
+    },
+  })
 
   const displayName = useMemo(() => getDisplayName(user), [user])
   const avatarSrc = useMemo(() => {
@@ -43,6 +63,32 @@ export default function Navbar() {
       setLoginOpen(false)
     }
   }, [user])
+
+  useEffect(() => {
+    if (!user?.id) {
+      appleMusicAutoConnectAttemptedRef.current = false
+      return
+    }
+    const authProvider = (user.auth_provider || "").trim().toLowerCase()
+    if (authProvider !== "apple") {
+      appleMusicAutoConnectAttemptedRef.current = false
+      return
+    }
+    if (appleMusicAutoConnectAttemptedRef.current || isAppleMusicAutoConnectPending) {
+      return
+    }
+    let shouldAutoConnect = false
+    try {
+      shouldAutoConnect = window.sessionStorage.getItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY) === "1"
+    } catch {
+      return
+    }
+    if (!shouldAutoConnect) {
+      return
+    }
+    appleMusicAutoConnectAttemptedRef.current = true
+    triggerAppleMusicAutoConnect()
+  }, [user?.id, user?.auth_provider, isAppleMusicAutoConnectPending, triggerAppleMusicAutoConnect])
 
   /** Start the SoundCloud OAuth flow. */
   const handleSoundcloudLogin = () => {
@@ -62,7 +108,7 @@ export default function Navbar() {
     try {
       window.sessionStorage.setItem(APPLE_MUSICKIT_AUTO_CONNECT_KEY, '1')
     } catch {
-      // Ignore storage errors; fallback manual connect remains available.
+      // Ignore storage errors.
     }
     window.location.href = `${API_URL}/api/v1/auth/login/apple?next=${encodeURIComponent(next)}`
   }

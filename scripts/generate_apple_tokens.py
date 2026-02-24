@@ -70,22 +70,24 @@ def _upsert_env_value(path: Path, key: str, value: str) -> None:
     if path.exists():
         lines = path.read_text(encoding="utf-8").splitlines()
 
-    replaced = False
-    for index, line in enumerate(lines):
+    normalized_lines: list[str] = []
+    updated_line = f"{key}={value}"
+    replaced_any = False
+    for line in lines:
         match = ENV_LINE_RE.match(line.strip())
-        if not match:
+        if match and match.group(1) == key:
+            if not replaced_any:
+                normalized_lines.append(updated_line)
+                replaced_any = True
             continue
-        if match.group(1) == key:
-            lines[index] = f"{key}={value}"
-            replaced = True
-            break
+        normalized_lines.append(line)
 
-    if not replaced:
-        if lines and lines[-1].strip():
-            lines.append("")
-        lines.append(f"{key}={value}")
+    if not replaced_any:
+        if normalized_lines and normalized_lines[-1].strip():
+            normalized_lines.append("")
+        normalized_lines.append(updated_line)
 
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(normalized_lines) + "\n", encoding="utf-8")
 
 
 def _build_parser() -> argparse.ArgumentParser:
