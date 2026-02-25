@@ -91,6 +91,69 @@ def test_list_playlists_paginates_and_maps(monkeypatch):
     assert playlists[1].url == "https://music.apple.com/library/playlist/lib-2"
 
 
+def test_list_playlists_backfills_track_count_when_missing(monkeypatch):
+    monkeypatch.setattr(settings, "APPLE_MUSIC_DEVELOPER_TOKEN", "dev-token")
+    AppleMusicProvider._playlist_track_count_cache = {}
+    provider = AppleMusicProvider("user-token")
+    requests = {"tracks": 0}
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict | None = None):
+            parsed = urlparse(url)
+            if parsed.path == "/v1/me/library/playlists":
+                return _response(
+                    "GET",
+                    "https://api.music.apple.com/v1/me/library/playlists",
+                    {
+                        "data": [
+                            {
+                                "id": "lib-no-count",
+                                "attributes": {
+                                    "name": "No Count Playlist",
+                                },
+                            }
+                        ],
+                        "next": None,
+                    },
+                )
+            if parsed.path == "/v1/me/library/playlists/lib-no-count/tracks":
+                requests["tracks"] += 1
+                return _response(
+                    "GET",
+                    "https://api.music.apple.com/v1/me/library/playlists/lib-no-count/tracks",
+                    {
+                        "data": [
+                            {"id": "t1", "attributes": {"name": "One"}},
+                            {"id": "t2", "attributes": {"name": "Two"}},
+                            {"id": "t3", "attributes": {"name": "Three"}},
+                        ],
+                        "next": None,
+                    },
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    first = asyncio.run(provider.list_playlists())
+    second = asyncio.run(provider.list_playlists())
+
+    assert len(first) == 1
+    assert first[0].provider_playlist_id == "lib-no-count"
+    assert first[0].track_count == 3
+    assert len(second) == 1
+    assert second[0].track_count == 3
+    assert requests["tracks"] == 1
+
+
 def test_get_playlist_catalog_and_resolve_url(monkeypatch):
     monkeypatch.setattr(settings, "APPLE_MUSIC_DEVELOPER_TOKEN", "dev-token")
     provider = AppleMusicProvider("user-token")

@@ -226,6 +226,13 @@ export default function AppDataTable<TData>({
                 <AppButton
                   intent="ghost"
                   disabled={!table.getCanPreviousPage()}
+                  onClick={() => table.setPageIndex(0)}
+                >
+                  First
+                </AppButton>
+                <AppButton
+                  intent="ghost"
+                  disabled={!table.getCanPreviousPage()}
                   onClick={() => table.previousPage()}
                 >
                   Previous
@@ -236,6 +243,13 @@ export default function AppDataTable<TData>({
                   onClick={() => table.nextPage()}
                 >
                   Next
+                </AppButton>
+                <AppButton
+                  intent="ghost"
+                  disabled={!table.getCanNextPage()}
+                  onClick={() => table.setPageIndex(Math.max(table.getPageCount() - 1, 0))}
+                >
+                  Last
                 </AppButton>
               </div>
             ) : null}

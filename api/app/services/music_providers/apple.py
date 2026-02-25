@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import time
 from typing import Any, Sequence
 from urllib.parse import parse_qs, quote, urlparse
@@ -26,15 +27,20 @@ class AppleMusicProvider(MusicProviderClient):
     provider = "apple"
     _REQUEST_TIMEOUT_SECONDS = 15
     _DEVELOPER_TOKEN_SKEW_SECONDS = 300
+    _TRACK_COUNT_CACHE_TTL_SECONDS = 300.0
+    _TRACK_COUNT_HYDRATION_CONCURRENCY = 4
     _TRACK_TYPES = {"library-songs", "library-music-videos", "songs", "music-videos"}
 
     _developer_token_lock = asyncio.Lock()
     _developer_token_cache: tuple[str, float] | None = None
+    _track_count_cache_lock = asyncio.Lock()
+    _playlist_track_count_cache: dict[str, tuple[float, int]] = {}
 
     def __init__(self, access_token: str):
         super().__init__(access_token)
         self.base_url = settings.APPLE_MUSIC_API_BASE_URL or "https://api.music.apple.com"
         self.storefront = (settings.APPLE_MUSIC_STOREFRONT or "us").strip() or "us"
+        self._cache_identity = hashlib.sha256(access_token.encode("utf-8")).hexdigest()[:16]
 
     @classmethod
     def _clean_id(cls, value: str) -> str | None:
@@ -117,6 +123,18 @@ class AppleMusicProvider(MusicProviderClient):
         width = value.get("width") if isinstance(value.get("width"), int) and value.get("width") else 500
         height = value.get("height") if isinstance(value.get("height"), int) and value.get("height") else 500
         return template_url.replace("{w}", str(width)).replace("{h}", str(height))
+
+    @staticmethod
+    def _coerce_non_negative_int(value: Any) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return value if value >= 0 else None
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.isdigit():
+                return int(stripped)
+        return None
 
     @classmethod
     def _extract_id_from_url(cls, raw_url: str, resource: str) -> str | None:
@@ -223,6 +241,109 @@ class AppleMusicProvider(MusicProviderClient):
             return [data]
         return []
 
+    @classmethod
+    def _extract_playlist_track_count(cls, payload: Any) -> int | None:
+        if not isinstance(payload, dict):
+            return None
+        attributes = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
+        track_count = cls._coerce_non_negative_int(attributes.get("trackCount"))
+        if track_count is not None:
+            return track_count
+
+        relationships = payload.get("relationships")
+        if not isinstance(relationships, dict):
+            return None
+        tracks = relationships.get("tracks")
+        if not isinstance(tracks, dict):
+            return None
+
+        meta = tracks.get("meta")
+        if isinstance(meta, dict):
+            for key in ("total", "count", "trackCount"):
+                track_count = cls._coerce_non_negative_int(meta.get(key))
+                if track_count is not None:
+                    return track_count
+
+        data = tracks.get("data")
+        if isinstance(data, list) and cls._next_url_from_payload(tracks) is None:
+            return len(data)
+        return None
+
+    def _playlist_track_count_cache_key(self, playlist_id: str) -> str:
+        return f"apple:playlist-track-count:{self._cache_identity}:{playlist_id}"
+
+    @classmethod
+    async def _get_cached_playlist_track_count(cls, cache_key: str) -> int | None:
+        async with cls._track_count_cache_lock:
+            cached_entry = cls._playlist_track_count_cache.get(cache_key)
+            if not cached_entry:
+                return None
+            cached_at, cached_value = cached_entry
+            if (time.monotonic() - cached_at) > cls._TRACK_COUNT_CACHE_TTL_SECONDS:
+                cls._playlist_track_count_cache.pop(cache_key, None)
+                return None
+            return cached_value
+
+    @classmethod
+    async def _set_cached_playlist_track_count(cls, cache_key: str, track_count: int) -> None:
+        async with cls._track_count_cache_lock:
+            cls._playlist_track_count_cache[cache_key] = (time.monotonic(), track_count)
+
+    async def _invalidate_cached_playlist_track_count(self, playlist_id: str) -> None:
+        cache_key = self._playlist_track_count_cache_key(playlist_id)
+        async with self._track_count_cache_lock:
+            self._playlist_track_count_cache.pop(cache_key, None)
+
+    async def _count_playlist_tracks(
+        self,
+        client: httpx.AsyncClient,
+        headers: dict[str, str],
+        playlist_id: str,
+    ) -> int | None:
+        cache_key = self._playlist_track_count_cache_key(playlist_id)
+        cached_track_count = await self._get_cached_playlist_track_count(cache_key)
+        if cached_track_count is not None:
+            return cached_track_count
+
+        count = 0
+        next_url: str | None = f"/v1/me/library/playlists/{playlist_id}/tracks"
+        params: dict[str, Any] | None = {"limit": 100, "offset": 0}
+        try:
+            while next_url:
+                response = await client.get(next_url, headers=headers, params=params)
+                self._raise_for_status(response)
+                payload = response.json()
+                count += len(self._extract_data_list(payload))
+                next_url = self._next_url_from_payload(payload)
+                params = None
+        except ProviderAuthError:
+            raise
+        except ProviderAPIError:
+            return None
+
+        await self._set_cached_playlist_track_count(cache_key, count)
+        return count
+
+    async def _hydrate_missing_playlist_track_counts(
+        self,
+        client: httpx.AsyncClient,
+        headers: dict[str, str],
+        playlists: list[ProviderPlaylist],
+    ) -> None:
+        missing = [playlist for playlist in playlists if playlist.track_count is None]
+        if not missing:
+            return
+
+        semaphore = asyncio.Semaphore(self._TRACK_COUNT_HYDRATION_CONCURRENCY)
+
+        async def hydrate(playlist: ProviderPlaylist) -> None:
+            async with semaphore:
+                track_count = await self._count_playlist_tracks(client, headers, playlist.provider_playlist_id)
+            if track_count is not None:
+                playlist.track_count = track_count
+
+        await asyncio.gather(*(hydrate(playlist) for playlist in missing))
+
     async def _get_developer_token(self) -> str:
         static_token = (settings.APPLE_MUSIC_DEVELOPER_TOKEN or "").strip()
         if static_token:
@@ -293,7 +414,7 @@ class AppleMusicProvider(MusicProviderClient):
         attributes = payload.get("attributes") if isinstance(payload.get("attributes"), dict) else {}
         title = attributes.get("name")
         description = self._extract_description(attributes.get("description"))
-        track_count = attributes.get("trackCount") if isinstance(attributes.get("trackCount"), int) else None
+        track_count = self._extract_playlist_track_count(payload)
         is_public = attributes.get("isPublic") if isinstance(attributes.get("isPublic"), bool) else None
         playlist_url = attributes.get("url") if isinstance(attributes.get("url"), str) else None
         if not playlist_url:
@@ -345,6 +466,7 @@ class AppleMusicProvider(MusicProviderClient):
                         playlists.append(mapped)
                 next_url = self._next_url_from_payload(payload)
                 params = None
+            await self._hydrate_missing_playlist_track_counts(client, headers, playlists)
         return playlists
 
     async def get_playlist(self, provider_playlist_id: str) -> ProviderPlaylist:
@@ -459,6 +581,11 @@ class AppleMusicProvider(MusicProviderClient):
                 break
         if not mapped_playlist:
             raise ProviderAPIError("Unable to create playlist", status_code=502)
+        created_track_count = mapped_playlist.track_count if mapped_playlist.track_count is not None else 0
+        await self._set_cached_playlist_track_count(
+            self._playlist_track_count_cache_key(mapped_playlist.provider_playlist_id),
+            created_track_count,
+        )
         return ProviderPlaylist(
             provider=mapped_playlist.provider,
             provider_playlist_id=mapped_playlist.provider_playlist_id,
@@ -466,7 +593,7 @@ class AppleMusicProvider(MusicProviderClient):
             description=mapped_playlist.description if mapped_playlist.description is not None else description,
             image_url=mapped_playlist.image_url,
             url=mapped_playlist.url,
-            track_count=mapped_playlist.track_count,
+            track_count=created_track_count,
             is_public=bool(is_public) if is_public is not None else mapped_playlist.is_public,
         )
 
@@ -516,6 +643,7 @@ class AppleMusicProvider(MusicProviderClient):
                 json={"data": data_items},
             )
             self._raise_for_status(response)
+        await self._invalidate_cached_playlist_track_count(playlist_id)
 
     async def remove_tracks(self, provider_playlist_id: str, track_ids: Sequence[str]) -> None:
         raise ProviderAPIError(
