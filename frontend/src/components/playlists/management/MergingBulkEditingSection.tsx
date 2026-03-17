@@ -161,7 +161,11 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                       Enter playlist text to search, or paste a playlist URL.
                     </Text>
                     {playlists.otherPlaylist.search.status ? (
-                      <StatusCallout tone="error" title="Search status" className="mt-2">
+                      <StatusCallout
+                        tone={playlists.otherPlaylist.search.statusTone}
+                        title="Search status"
+                        className="mt-2"
+                      >
                         {playlists.otherPlaylist.search.status}
                       </StatusCallout>
                     ) : null}

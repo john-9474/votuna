@@ -8,6 +8,7 @@ import type { ManagementPlaylistRef, VotunaPlaylist } from '@/lib/types/votuna'
 import type { ManagementCounterpartyOption, ProviderPlaylist } from './shared'
 
 export type CounterpartySourceMode = 'my_playlists' | 'search_playlists'
+export type CounterpartySearchStatusTone = 'info' | 'success' | 'warning' | 'error'
 
 type UseManagementCounterpartyArgs = {
   playlist: VotunaPlaylist | null
@@ -40,6 +41,7 @@ export function useManagementCounterparty({
   const [selectedCounterpartyKey, setSelectedCounterpartyKey] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [searchStatus, setSearchStatus] = useState('')
+  const [searchStatusTone, setSearchStatusTone] = useState<CounterpartySearchStatusTone>('info')
   const [isSearchPending, setIsSearchPending] = useState(false)
   const [searchCounterpartyOptions, setSearchCounterpartyOptions] = useState<
     ManagementCounterpartyOption[]
@@ -181,6 +183,7 @@ export function useManagementCounterparty({
     const query = searchInput.trim()
     if (!query) return
     setSearchStatus('')
+    setSearchStatusTone('info')
     setIsSearchPending(true)
 
     try {
@@ -195,11 +198,13 @@ export function useManagementCounterparty({
         const option = toProviderCounterpartyOption(resolved)
         if (!option) {
           setSearchCounterpartyOptions([])
+          setSearchStatusTone('warning')
           setSearchStatus('This playlist cannot be used as the source for this transfer.')
           return
         }
         setSearchCounterpartyOptions([option])
         setSelectedCounterpartyKey(option.key)
+        setSearchStatusTone('success')
         setSearchStatus('Playlist loaded from link.')
         return
       }
@@ -219,10 +224,12 @@ export function useManagementCounterparty({
       )
       setSearchCounterpartyOptions(options)
       if (options.length === 0) {
+        setSearchStatusTone('info')
         setSearchStatus('No playlists found for that search.')
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to search playlists'
+      setSearchStatusTone('error')
       setSearchStatus(message)
       setSearchCounterpartyOptions([])
     } finally {
@@ -236,6 +243,7 @@ export function useManagementCounterparty({
     searchInput,
     setSearchInput,
     searchStatus,
+    searchStatusTone,
     isSearchPending,
     discoverCounterpartyPlaylists,
     myCounterpartyOptions,

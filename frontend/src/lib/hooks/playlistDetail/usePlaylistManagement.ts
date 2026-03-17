@@ -88,6 +88,7 @@ export type PlaylistManagementState = {
         run: () => void
         isPending: boolean
         status: string
+        statusTone: 'info' | 'success' | 'warning' | 'error'
         hasResults: boolean
       }
     }
@@ -211,6 +212,7 @@ export function usePlaylistManagement({
     searchInput: counterpartySearchInput,
     setSearchInput: setCounterpartySearchInput,
     searchStatus: counterpartySearchStatus,
+    searchStatusTone: counterpartySearchStatusTone,
     isSearchPending: isCounterpartySearchPending,
     discoverCounterpartyPlaylists,
     myCounterpartyOptions,
@@ -558,6 +560,7 @@ export function usePlaylistManagement({
           run: discoverCounterpartyPlaylists,
           isPending: isCounterpartySearchPending,
           status: counterpartySearchStatus,
+          statusTone: counterpartySearchStatusTone,
           hasResults: searchCounterpartyOptions.length > 0,
         },
       },
