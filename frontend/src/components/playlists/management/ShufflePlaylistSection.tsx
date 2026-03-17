@@ -63,7 +63,7 @@ export default function ShufflePlaylistSection({ shuffle }: ShufflePlaylistSecti
           <div className="mt-2 grid gap-2 text-xs text-[color:rgb(var(--votuna-ink)/0.65)] sm:grid-cols-2">
             <Text>Total songs: {shuffle.result.total_items}</Text>
             <Text>Moved songs: {shuffle.result.moved_items}</Text>
-            <Text>Max allowed: {shuffle.result.max_items}</Text>
+            {shuffle.result.max_items !== null ? <Text>Max allowed: {shuffle.result.max_items}</Text> : null}
             <Text>Provider: {shuffle.result.provider}</Text>
           </div>
         </AppPanelRow>

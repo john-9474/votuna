@@ -749,11 +749,16 @@ class TidalProvider(MusicProviderClient):
             )
             self._raise_for_status(response)
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         playlist_id = self._normalize_playlist_id(provider_playlist_id)
         if not playlist_id:
             raise ProviderAPIError("Playlist id is required", status_code=400)
-        safe_max_items = max(1, int(max_items))
+        safe_max_items = max(1, int(max_items)) if max_items is not None else None
 
         async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
             playlist_items = await self._list_playlist_items(client, playlist_id)
@@ -766,7 +771,7 @@ class TidalProvider(MusicProviderClient):
 
             ordered_item_ids = [item.item_id for item in playlist_items if item.item_id]
             total_items = len(ordered_item_ids)
-            if total_items > safe_max_items:
+            if safe_max_items is not None and total_items > safe_max_items:
                 raise ProviderAPIError(
                     f"Shuffle exceeds max tracks per action ({safe_max_items})",
                     status_code=400,

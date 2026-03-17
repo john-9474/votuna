@@ -112,5 +112,5 @@ class ManagementShuffleResponse(BaseModel):
     provider_playlist_id: str
     total_items: int
     moved_items: int
-    max_items: int
+    max_items: int | None = None
     error: str | None = None

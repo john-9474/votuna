@@ -199,11 +199,12 @@ def test_shuffle_playlist_reorders_tracks_and_preserves_duplicates(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
 
-    result = asyncio.run(provider.shuffle_playlist("playlist-1", max_items=500))
+    result = asyncio.run(provider.shuffle_playlist("playlist-1"))
 
     assert result.status == "completed"
     assert result.total_items == 4
     assert result.moved_items == 3
+    assert result.max_items is None
     assert result.error is None
     payload = captured["json"]
     assert isinstance(payload, dict)
@@ -253,11 +254,12 @@ def test_shuffle_playlist_returns_partial_failure_when_update_fails(monkeypatch)
 
     monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
 
-    result = asyncio.run(provider.shuffle_playlist("playlist-1", max_items=500))
+    result = asyncio.run(provider.shuffle_playlist("playlist-1"))
 
     assert result.status == "partial_failure"
     assert result.total_items == 3
     assert result.moved_items == 3
+    assert result.max_items is None
     assert "SoundCloud API error" in (result.error or "")
 
 

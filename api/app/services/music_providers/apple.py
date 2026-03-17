@@ -651,7 +651,12 @@ class AppleMusicProvider(MusicProviderClient):
             status_code=501,
         )
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         raise ProviderAPIError(
             "Apple Music playlist shuffling is not supported for library playlists",
             status_code=501,

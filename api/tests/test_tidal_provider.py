@@ -558,11 +558,12 @@ def test_shuffle_playlist_reorders_using_item_ids_and_preserves_duplicates(monke
 
     monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
 
-    result = asyncio.run(provider.shuffle_playlist("pl-1", max_items=500))
+    result = asyncio.run(provider.shuffle_playlist("pl-1"))
 
     assert result.status == "completed"
     assert result.total_items == 4
     assert result.moved_items == 2
+    assert result.max_items is None
     assert result.error is None
     assert captured_patch_payloads == [
         {
@@ -628,11 +629,12 @@ def test_shuffle_playlist_returns_partial_failure_when_move_fails(monkeypatch):
 
     monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
 
-    result = asyncio.run(provider.shuffle_playlist("pl-1", max_items=500))
+    result = asyncio.run(provider.shuffle_playlist("pl-1"))
 
     assert result.status == "partial_failure"
     assert result.total_items == 4
     assert result.moved_items == 1
+    assert result.max_items is None
     assert "TIDAL API error" in (result.error or "")
 
 

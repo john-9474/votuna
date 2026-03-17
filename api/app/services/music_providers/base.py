@@ -54,7 +54,7 @@ class ProviderShuffleResult:
     provider_playlist_id: str
     total_items: int
     moved_items: int
-    max_items: int
+    max_items: int | None
     error: str | None = None
 
 
@@ -122,7 +122,12 @@ class MusicProviderClient:
         """Fetch a provider user by provider-specific id."""
         raise NotImplementedError
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         """Shuffle a provider playlist in place."""
         raise ProviderAPIError(
             f"{self.provider.capitalize()} playlist shuffling is not supported",

@@ -695,11 +695,16 @@ class SoundcloudProvider(MusicProviderClient):
             )
             self._raise_for_status(update_response)
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         playlist_id = provider_playlist_id.strip()
         if not playlist_id:
             raise ProviderAPIError("Playlist id is required", status_code=400)
-        safe_max_items = max(1, int(max_items))
+        safe_max_items = max(1, int(max_items)) if max_items is not None else None
 
         async with httpx.AsyncClient(base_url=self.base_url, timeout=20) as client:
             response = await client.get(
@@ -731,7 +736,7 @@ class SoundcloudProvider(MusicProviderClient):
                 )
 
             total_items = len(track_refs)
-            if total_items > safe_max_items:
+            if safe_max_items is not None and total_items > safe_max_items:
                 raise ProviderAPIError(
                     f"Shuffle exceeds max tracks per action ({safe_max_items})",
                     status_code=400,

@@ -366,7 +366,12 @@ class DummyProvider:
     async def track_exists(self, provider_playlist_id: str, track_id: str) -> bool:
         return self.track_exists_value
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         self.shuffle_calls.append(
             {
                 "provider_playlist_id": provider_playlist_id,

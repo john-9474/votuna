@@ -41,7 +41,6 @@ from app.services.music_providers import MusicProviderClient, ProviderAPIError, 
 router = APIRouter()
 
 MAX_TRACKS_PER_ACTION = 500
-MAX_TRACKS_PER_SHUFFLE = 500
 ADD_CHUNK_SIZE = 100
 FACETS_LIMIT = 100
 
@@ -430,10 +429,7 @@ async def shuffle_management_playlist(
     playlist = require_owner(db, playlist_id, current_user.id)
     client = get_owner_client(db, playlist)
     try:
-        shuffle_result = await client.shuffle_playlist(
-            playlist.provider_playlist_id,
-            max_items=MAX_TRACKS_PER_SHUFFLE,
-        )
+        shuffle_result = await client.shuffle_playlist(playlist.provider_playlist_id)
     except ProviderAuthError:
         raise_provider_auth(
             current_user,

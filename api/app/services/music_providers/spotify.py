@@ -613,15 +613,20 @@ class SpotifyProvider(MusicProviderClient):
         self._invalidate_track_cache(playlist_id)
         self._invalidate_playlist_cache()
 
-    async def shuffle_playlist(self, provider_playlist_id: str, *, max_items: int = 500) -> ProviderShuffleResult:
+    async def shuffle_playlist(
+        self,
+        provider_playlist_id: str,
+        *,
+        max_items: int | None = None,
+    ) -> ProviderShuffleResult:
         playlist_id = self._normalize_resource_id(provider_playlist_id, "playlist")
         if not playlist_id:
             raise ProviderAPIError("Playlist id is required", status_code=400)
-        safe_max_items = max(1, int(max_items))
+        safe_max_items = max(1, int(max_items)) if max_items is not None else None
 
         async with httpx.AsyncClient(base_url=self.base_url, timeout=self._REQUEST_TIMEOUT_SECONDS) as client:
             total_items = await self._fetch_playlist_item_total(client, playlist_id)
-            if total_items > safe_max_items:
+            if safe_max_items is not None and total_items > safe_max_items:
                 raise ProviderAPIError(
                     f"Shuffle exceeds max tracks per action ({safe_max_items})",
                     status_code=400,

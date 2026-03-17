@@ -147,10 +147,10 @@ def test_management_shuffle_owner_success(auth_client, votuna_playlist, provider
     assert data["provider_playlist_id"] == votuna_playlist.provider_playlist_id
     assert data["total_items"] == 6
     assert data["moved_items"] == 4
-    assert data["max_items"] == 500
+    assert data["max_items"] is None
     assert data["error"] is None
     assert provider_stub.shuffle_calls[-1]["provider_playlist_id"] == votuna_playlist.provider_playlist_id
-    assert provider_stub.shuffle_calls[-1]["max_items"] == 500
+    assert provider_stub.shuffle_calls[-1]["max_items"] is None
 
 
 def test_management_shuffle_partial_failure_returns_200(auth_client, votuna_playlist, provider_stub):
@@ -180,7 +180,7 @@ def test_management_shuffle_unsupported_provider_returns_405(auth_client, votuna
     assert response.status_code == 405
 
 
-def test_management_shuffle_over_limit_returns_400(auth_client, votuna_playlist, provider_stub):
+def test_management_shuffle_provider_bad_request_returns_400(auth_client, votuna_playlist, provider_stub):
     provider_stub.shuffle_raise_status_code = 400
 
     response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/shuffle")

@@ -187,7 +187,7 @@ export type ManagementShuffleResponse = {
   provider_playlist_id: string
   total_items: number
   moved_items: number
-  max_items: number
+  max_items: number | null
   error?: string | null
 }
 
