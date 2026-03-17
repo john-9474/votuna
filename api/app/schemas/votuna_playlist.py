@@ -34,6 +34,7 @@ class ProviderTrackOut(BaseModel):
     genre: str | None = None
     artwork_url: str | None = None
     url: str | None = None
+    access: str | None = None
     added_at: datetime | None = None
     added_source: TrackAddedSource = "outside_votuna"
     added_by_label: str | None = None

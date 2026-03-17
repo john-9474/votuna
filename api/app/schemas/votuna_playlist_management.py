@@ -106,6 +106,15 @@ class ManagementExecuteResponse(BaseModel):
     failed_items: list[ManagementFailedItem] = Field(default_factory=list)
 
 
+class ManagementPremiumCleanupResponse(BaseModel):
+    provider: MusicProvider
+    provider_playlist_id: str
+    matched_count: int
+    removed_count: int
+    failed_count: int
+    error: str | None = None
+
+
 class ManagementShuffleResponse(BaseModel):
     status: ManagementShuffleStatus
     provider: MusicProvider

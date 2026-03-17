@@ -11,6 +11,7 @@ import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
 import TrackArtwork from './TrackArtwork'
+import SoundCloudGoBadge from './SoundCloudGoBadge'
 
 type TracksSectionProps = {
   provider: string
@@ -89,6 +90,9 @@ export default function TracksSection({
                 <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                   {track.artist || 'Unknown artist'}
                 </Text>
+                <div className="mt-1">
+                  <SoundCloudGoBadge provider={provider} access={track.access} />
+                </div>
               </div>
             </div>
           )
@@ -191,6 +195,7 @@ export default function TracksSection({
       isRemoveTrackPending,
       onPlayTrack,
       onRemoveTrack,
+      provider,
       removingTrackId,
     ],
   )

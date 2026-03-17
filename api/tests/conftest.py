@@ -350,6 +350,7 @@ class DummyProvider:
                     genre=template.genre,
                     artwork_url=template.artwork_url,
                     url=template.url,
+                    access=template.access,
                 )
             )
             existing_ids.add(track_id)

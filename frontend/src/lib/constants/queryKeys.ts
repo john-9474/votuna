@@ -24,10 +24,14 @@ export const queryKeys = {
     offset: number,
   ) =>
     ['votunaManagementSourceTracks', playlistId, sourceKey, search, limit, offset] as const,
+  votunaManagementSourceTracksRoot: (playlistId: string | undefined) =>
+    ['votunaManagementSourceTracks', playlistId] as const,
   votunaManagementFacets: (
     playlistId: string | undefined,
     sourceKey: string,
   ) => ['votunaManagementFacets', playlistId, sourceKey] as const,
+  votunaManagementFacetsRoot: (playlistId: string | undefined) =>
+    ['votunaManagementFacets', playlistId] as const,
   votunaInviteCandidates: (
     playlistId: string | undefined,
     query: string,

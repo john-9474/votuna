@@ -11,6 +11,7 @@ import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 
 import TrackArtwork from './TrackArtwork'
+import SoundCloudGoBadge from './SoundCloudGoBadge'
 
 type SearchSuggestSectionProps = {
   provider: string
@@ -170,6 +171,9 @@ export default function SearchSuggestSection({
                           {track.artist || 'Unknown artist'}
                         </Text>
                       )}
+                    </div>
+                    <div className="mt-1">
+                      <SoundCloudGoBadge provider={provider} access={track.access} />
                     </div>
                   </div>
                 </div>
@@ -344,6 +348,9 @@ export default function SearchSuggestSection({
                           <Text className="mt-1 truncate text-xs text-[color:rgb(var(--votuna-ink)/0.6)]">
                             {track.artist || 'Unknown artist'}
                           </Text>
+                          <div className="mt-2">
+                            <SoundCloudGoBadge provider={provider} access={track.access} />
+                          </div>
                         </div>
                         <div className="mt-3 flex items-center justify-center gap-2">
                           <AppButton

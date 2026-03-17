@@ -6,6 +6,7 @@ import { queryKeys } from '@/lib/constants/queryKeys'
 import type {
   ManagementExecuteResponse,
   ManagementPlaylistRef,
+  ManagementPremiumCleanupResponse,
   ManagementPreviewResponse,
   ManagementShuffleResponse,
   ManagementSourceTracksResponse,
@@ -45,6 +46,7 @@ type ManagementFacetSelectionState = {
 }
 
 export type PlaylistManagementState = {
+  provider: string | null
   permissions: {
     canManage: boolean
   }
@@ -143,6 +145,13 @@ export type PlaylistManagementState = {
     result: ManagementShuffleResponse | null
     statusMessage: string
   }
+  premiumCleanup: {
+    isAvailable: boolean
+    run: () => void
+    isRunning: boolean
+    result: ManagementPremiumCleanupResponse | null
+    statusMessage: string
+  }
 }
 
 type UsePlaylistManagementArgs = {
@@ -154,11 +163,6 @@ type UsePlaylistManagementArgs = {
 }
 
 const DEFAULT_UTILITY_SECTIONS = [
-  {
-    id: 'duplicate-cleanup',
-    title: 'Duplicate cleanup',
-    description: 'Coming soon: remove duplicate songs inside a playlist.',
-  },
   {
     id: 'more-utilities',
     title: 'More utilities',
@@ -189,8 +193,12 @@ export function usePlaylistManagement({
   const [artistCustomInput, setArtistCustomInput] = useState('')
   const [shuffleResult, setShuffleResult] = useState<ManagementShuffleResponse | null>(null)
   const [shuffleStatusMessage, setShuffleStatusMessage] = useState('')
+  const [premiumCleanupResult, setPremiumCleanupResult] = useState<ManagementPremiumCleanupResponse | null>(null)
+  const [premiumCleanupStatusMessage, setPremiumCleanupStatusMessage] = useState('')
 
   const direction = actionToDirection(action)
+  const normalizedProvider = playlist?.provider?.trim().toLowerCase() ?? ''
+  const isSoundCloudPlaylist = normalizedProvider === 'soundcloud'
 
   const counterpartyState = useManagementCounterparty({
     playlist,
@@ -310,6 +318,8 @@ export function usePlaylistManagement({
   useEffect(() => {
     setShuffleResult(null)
     setShuffleStatusMessage('')
+    setPremiumCleanupResult(null)
+    setPremiumCleanupStatusMessage('')
   }, [playlistId])
 
   const shuffleMutation = useMutation({
@@ -351,6 +361,53 @@ export function usePlaylistManagement({
     if (!playlistId || !canManage || shuffleMutation.isPending) return
     shuffleMutation.mutate()
   }, [canManage, playlistId, shuffleMutation])
+
+  const premiumCleanupMutation = useMutation({
+    mutationFn: async () => {
+      if (!playlistId) {
+        throw new Error('Playlist id is required')
+      }
+      return apiJson<ManagementPremiumCleanupResponse>(
+        `/api/v1/votuna/playlists/${playlistId}/management/remove-premium-songs`,
+        {
+          method: 'POST',
+          authRequired: true,
+        },
+      )
+    },
+    onMutate: () => {
+      setPremiumCleanupResult(null)
+      setPremiumCleanupStatusMessage('')
+    },
+    onSuccess: async (data) => {
+      setPremiumCleanupResult(data)
+      if (data.removed_count > 0) {
+        setPremiumCleanupStatusMessage(`Removed ${data.removed_count} premium songs.`)
+      } else {
+        setPremiumCleanupStatusMessage('No SoundCloud Go+ songs were found in this playlist.')
+      }
+      transferState.resetReview()
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.votunaTracks(playlistId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.votunaPlaylist(playlistId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.providerPlaylistsRoot }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.votunaManagementSourceTracksRoot(playlistId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.votunaManagementFacetsRoot(playlistId) }),
+      ])
+    },
+    onError: (error) => {
+      const apiError = error as ApiError
+      setPremiumCleanupResult(null)
+      setPremiumCleanupStatusMessage(
+        apiError?.detail || apiError?.message || 'Unable to remove premium songs',
+      )
+    },
+  })
+
+  const runPremiumCleanup = useCallback(() => {
+    if (!playlistId || !canManage || !isSoundCloudPlaylist || premiumCleanupMutation.isPending) return
+    premiumCleanupMutation.mutate()
+  }, [canManage, isSoundCloudPlaylist, playlistId, premiumCleanupMutation])
 
   const selectedCounterpartyOption = useMemo(
     () =>
@@ -456,6 +513,7 @@ export function usePlaylistManagement({
   }, [artistCustomInput])
 
   return {
+    provider: playlist?.provider ?? null,
     permissions: {
       canManage,
     },
@@ -578,6 +636,13 @@ export function usePlaylistManagement({
       isRunning: shuffleMutation.isPending,
       result: shuffleResult,
       statusMessage: shuffleStatusMessage,
+    },
+    premiumCleanup: {
+      isAvailable: canManage && isSoundCloudPlaylist,
+      run: runPremiumCleanup,
+      isRunning: premiumCleanupMutation.isPending,
+      result: premiumCleanupResult,
+      statusMessage: premiumCleanupStatusMessage,
     },
   }
 }

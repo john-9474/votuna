@@ -27,6 +27,7 @@ from app.schemas.votuna_playlist_management import (
     ManagementDestinationCreate,
     ManagementExecuteResponse,
     ManagementFailedItem,
+    ManagementPremiumCleanupResponse,
     ManagementPlaylistRef,
     ManagementPlaylistSummary,
     ManagementPreviewResponse,
@@ -117,6 +118,7 @@ def _provider_track_to_out(track: ProviderTrack) -> ProviderTrackOut:
         genre=track.genre,
         artwork_url=track.artwork_url,
         url=track.url,
+        access=track.access,
     )
 
 
@@ -182,6 +184,10 @@ def _dedupe_tracks_by_id(tracks: Sequence[ProviderTrack]) -> list[ProviderTrack]
 def _chunks(values: Sequence[str], chunk_size: int) -> Iterable[list[str]]:
     for index in range(0, len(values), chunk_size):
         yield list(values[index : index + chunk_size])
+
+
+def _is_soundcloud_premium_track(track: ProviderTrack) -> bool:
+    return (track.access or "").strip().lower() == "preview"
 
 
 async def _safe_get_playlist(
@@ -413,6 +419,61 @@ async def list_management_facets(
         genres=_build_facet_counts(track.genre for track in tracks),
         artists=_build_facet_counts(track.artist for track in tracks),
         total_tracks_considered=len(tracks),
+    )
+
+
+@router.post(
+    "/playlists/{playlist_id}/management/remove-premium-songs",
+    response_model=ManagementPremiumCleanupResponse,
+)
+async def remove_management_premium_tracks(
+    playlist_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Remove SoundCloud Go+ preview-only songs from the current playlist."""
+    playlist = require_owner(db, playlist_id, current_user.id)
+    if playlist.provider != "soundcloud":
+        raise HTTPException(
+            status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+            detail="Premium-song cleanup is only supported for SoundCloud playlists",
+        )
+
+    client = get_owner_client(db, playlist)
+    tracks = await _safe_list_tracks(
+        client=client,
+        provider_playlist_id=playlist.provider_playlist_id,
+        current_user=current_user,
+        owner_id=playlist.owner_user_id,
+        provider=playlist.provider,
+    )
+    premium_tracks = [track for track in tracks if _is_soundcloud_premium_track(track)]
+    premium_track_ids = list(
+        dict.fromkeys(track.provider_track_id for track in premium_tracks if track.provider_track_id)
+    )
+
+    if premium_track_ids:
+        try:
+            await client.remove_tracks(playlist.provider_playlist_id, premium_track_ids)
+        except ProviderAuthError:
+            raise_provider_auth(
+                current_user,
+                owner_id=playlist.owner_user_id,
+                provider=playlist.provider,
+            )
+            raise AssertionError("unreachable")
+        except ProviderAPIError as exc:
+            if exc.status_code == status.HTTP_501_NOT_IMPLEMENTED:
+                raise HTTPException(status_code=status.HTTP_405_METHOD_NOT_ALLOWED, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    return ManagementPremiumCleanupResponse(
+        provider=playlist.provider,  # type: ignore[arg-type]
+        provider_playlist_id=playlist.provider_playlist_id,
+        matched_count=len(premium_tracks),
+        removed_count=len(premium_tracks),
+        failed_count=0,
+        error=None,
     )
 
 

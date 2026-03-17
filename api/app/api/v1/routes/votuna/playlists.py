@@ -266,6 +266,7 @@ async def add_votuna_track(
     track_artist = payload.track_artist
     track_artwork_url = payload.track_artwork_url
     track_url = (payload.track_url or "").strip() or None
+    resolved_track_access: str | None = None
 
     if not provider_track_id and not track_url:
         raise HTTPException(
@@ -288,6 +289,7 @@ async def add_votuna_track(
         track_artist = track_artist or resolved_track.artist
         track_artwork_url = track_artwork_url or resolved_track.artwork_url
         track_url = resolved_track.url or track_url
+        resolved_track_access = resolved_track.access
 
     try:
         if await client.track_exists(playlist.provider_playlist_id, provider_track_id):
@@ -329,6 +331,7 @@ async def add_votuna_track(
         artist=track_artist,
         artwork_url=track_artwork_url,
         url=track_url,
+        access=resolved_track_access,
         added_at=now,
         added_source="personal_add",
         added_by_label="Added directly by You",
@@ -546,6 +549,7 @@ async def list_votuna_tracks(
                 genre=track.genre,
                 artwork_url=track.artwork_url,
                 url=track.url,
+                access=track.access,
                 added_at=added_at,
                 added_source=added_source,  # type: ignore[arg-type]
                 added_by_label=added_by_label,

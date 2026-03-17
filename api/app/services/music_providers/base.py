@@ -36,6 +36,7 @@ class ProviderTrack:
     genre: str | None = None
     artwork_url: str | None = None
     url: str | None = None
+    access: str | None = None
 
 
 @dataclass

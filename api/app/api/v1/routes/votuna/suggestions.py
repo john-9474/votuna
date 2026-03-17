@@ -109,6 +109,7 @@ def _serialize_provider_track(track: ProviderTrack) -> ProviderTrackOut:
         genre=track.genre,
         artwork_url=track.artwork_url,
         url=track.url,
+        access=track.access,
     )
 
 
@@ -402,6 +403,7 @@ async def search_tracks_for_suggestions(
             genre=track.genre,
             artwork_url=track.artwork_url,
             url=track.url,
+            access=track.access,
         )
         for track in results
     ]

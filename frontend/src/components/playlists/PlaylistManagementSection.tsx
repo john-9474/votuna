@@ -3,6 +3,7 @@ import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import MergingBulkEditingSection from '@/components/playlists/management/MergingBulkEditingSection'
 import ShufflePlaylistSection from '@/components/playlists/management/ShufflePlaylistSection'
+import SoundCloudPremiumCleanupSection from '@/components/playlists/management/SoundCloudPremiumCleanupSection'
 import UtilityStubSection from '@/components/playlists/management/UtilityStubSection'
 
 type PlaylistManagementSectionProps = {
@@ -35,6 +36,7 @@ export default function PlaylistManagementSection({ management }: PlaylistManage
     <div className="space-y-6">
       <MergingBulkEditingSection management={management} />
       <ShufflePlaylistSection shuffle={management.shuffle} />
+      <SoundCloudPremiumCleanupSection premiumCleanup={management.premiumCleanup} />
       {management.utilitySections.map((section) => (
         <UtilityStubSection
           key={section.id}

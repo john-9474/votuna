@@ -235,6 +235,13 @@ export function useManagementTransfer({
     isExecutePending: executeMutation.isPending,
     executeResult,
     executeError,
+    resetReview: () => {
+      setPreview(null)
+      setPreviewError('')
+      setPreviewRequestKey('')
+      setExecuteResult(null)
+      setExecuteError('')
+    },
     onExecute: () => {
       if (!playlistId || !managementRequest || !isReviewFresh) return
       executeMutation.mutate(managementRequest)

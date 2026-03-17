@@ -6,16 +6,19 @@ import AppPanelRow from '@/components/ui/AppPanelRow'
 import AppSectionHeader from '@/components/ui/AppSectionHeader'
 import StatusCallout from '@/components/ui/StatusCallout'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
+import SoundCloudGoBadge from '@/components/playlists/SoundCloudGoBadge'
 
 const REVIEW_TRACKS_PAGE_SIZE = 10
 
 type ReviewRunPanelProps = {
+  provider: string | null
   sourceLabel: string
   destinationLabel: string
   review: PlaylistManagementState['review']
 }
 
 export default function ReviewRunPanel({
+  provider,
   sourceLabel,
   destinationLabel,
   review,
@@ -122,9 +125,12 @@ export default function ReviewRunPanel({
                       return (
                         <TableRow key={`matched-${track.provider_track_id}`}>
                           <TableCell className="align-top !whitespace-normal">
-                            <span className="block truncate" title={track.title}>
-                              {track.title}
-                            </span>
+                            <div className="space-y-1">
+                              <span className="block truncate" title={track.title}>
+                                {track.title}
+                              </span>
+                              <SoundCloudGoBadge provider={provider} access={track.access} />
+                            </div>
                           </TableCell>
                           <TableCell className="align-top !whitespace-normal">
                             <span className="block truncate" title={track.artist || 'Unknown artist'}>

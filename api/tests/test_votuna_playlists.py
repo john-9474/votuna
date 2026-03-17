@@ -127,6 +127,28 @@ def test_list_votuna_tracks(auth_client, votuna_playlist, provider_stub):
     assert data[0]["suggested_by_display_name"] is None
 
 
+def test_list_votuna_tracks_includes_soundcloud_access(auth_client, votuna_playlist, provider_stub):
+    provider_stub.tracks_by_playlist_id[votuna_playlist.provider_playlist_id] = [
+        provider_stub.tracks[0],
+        provider_stub.tracks[1],
+        type(provider_stub.tracks[0])(
+            provider_track_id="track-preview",
+            title="Preview Track",
+            artist="Premium Artist",
+            genre="House",
+            artwork_url=None,
+            url="https://soundcloud.com/test/track-preview",
+            access="preview",
+        ),
+    ]
+
+    response = auth_client.get(f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks")
+    assert response.status_code == 200
+    data = response.json()
+    preview_track = next(track for track in data if track["provider_track_id"] == "track-preview")
+    assert preview_track["access"] == "preview"
+
+
 def test_remove_track_owner_success(auth_client, votuna_playlist, provider_stub):
     provider_stub.tracks_by_playlist_id[votuna_playlist.provider_playlist_id] = [
         provider_stub.tracks[0],

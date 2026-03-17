@@ -66,6 +66,7 @@ export type ProviderTrack = {
   genre?: string | null
   artwork_url?: string | null
   url?: string | null
+  access?: string | null
   added_at?: string | null
   added_source?: 'votuna_suggestion' | 'playlist_utils' | 'outside_votuna' | 'personal_add'
   added_by_label?: string | null
@@ -177,6 +178,15 @@ export type ManagementExecuteResponse = {
   skipped_duplicate_count: number
   failed_count: number
   failed_items: ManagementFailedItem[]
+}
+
+export type ManagementPremiumCleanupResponse = {
+  provider: string
+  provider_playlist_id: string
+  matched_count: number
+  removed_count: number
+  failed_count: number
+  error?: string | null
 }
 
 export type ManagementShuffleStatus = 'completed' | 'partial_failure'

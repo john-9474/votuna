@@ -8,6 +8,7 @@ import SectionEyebrow from '@/components/ui/SectionEyebrow'
 import StatusCallout from '@/components/ui/StatusCallout'
 import SurfaceCard from '@/components/ui/SurfaceCard'
 import type { PlaylistManagementState } from '@/lib/hooks/playlistDetail/usePlaylistManagement'
+import SoundCloudGoBadge from '@/components/playlists/SoundCloudGoBadge'
 
 import FacetSelector from './FacetSelector'
 import PlaylistGridPicker from './PlaylistGridPicker'
@@ -362,10 +363,13 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
                                 <Text className="truncate font-semibold text-[rgb(var(--votuna-ink))]">
                                   {track.title}
                                 </Text>
-                                <Text className="truncate text-xs">
-                                  {track.artist || 'Unknown artist'}
-                                  {track.genre ? ` - ${track.genre}` : ''}
-                                </Text>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <Text className="truncate text-xs">
+                                    {track.artist || 'Unknown artist'}
+                                    {track.genre ? ` - ${track.genre}` : ''}
+                                  </Text>
+                                  <SoundCloudGoBadge provider={management.provider} access={track.access} />
+                                </div>
                               </div>
                             </AppPanelRow>
                           </label>
@@ -407,6 +411,7 @@ export default function MergingBulkEditingSection({ management }: MergingBulkEdi
 
         <Col numColSpanLg={1}>
           <ReviewRunPanel
+            provider={management.provider}
             sourceLabel={playlists.sourceLabel}
             destinationLabel={playlists.destinationLabel}
             review={management.review}

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class SoundcloudProvider(MusicProviderClient):
     provider = "soundcloud"
+    _TRACK_ACCESS_FILTER = "playable,preview"
 
     def __init__(self, access_token: str):
         super().__init__(access_token)
@@ -213,6 +214,8 @@ class SoundcloudProvider(MusicProviderClient):
         track_id_value = str(track_ref[0]["id"])
         user_payload = payload.get("user")
         user = user_payload if isinstance(user_payload, dict) else {}
+        raw_access = payload.get("access")
+        access = raw_access.strip().lower() if isinstance(raw_access, str) and raw_access.strip() else None
         return ProviderTrack(
             provider_track_id=track_id_value,
             title=payload.get("title") or "Untitled",
@@ -220,6 +223,7 @@ class SoundcloudProvider(MusicProviderClient):
             genre=payload.get("genre"),
             artwork_url=payload.get("artwork_url") or user.get("avatar_url"),
             url=payload.get("permalink_url"),
+            access=access,
         )
 
     def _to_provider_playlist(self, payload: Any) -> ProviderPlaylist | None:
@@ -464,6 +468,7 @@ class SoundcloudProvider(MusicProviderClient):
                     **self._params(),
                     "q": search_query,
                     "limit": safe_limit,
+                    "access": self._TRACK_ACCESS_FILTER,
                 },
             )
             self._raise_for_status(response)
@@ -497,6 +502,7 @@ class SoundcloudProvider(MusicProviderClient):
                     "limit": safe_limit,
                     "offset": safe_offset,
                     "linked_partitioning": 1,
+                    "access": self._TRACK_ACCESS_FILTER,
                 },
             )
             self._raise_for_status(response)

@@ -39,6 +39,7 @@ def test_to_provider_track_uses_id_from_urn_when_id_is_missing():
         {
             "urn": "urn:soundcloud:tracks:999",
             "title": "URN Track",
+            "access": "preview",
             "user": {"username": "Artist"},
             "permalink_url": "https://soundcloud.com/test/urn-track",
         }
@@ -47,6 +48,7 @@ def test_to_provider_track_uses_id_from_urn_when_id_is_missing():
     assert mapped is not None
     assert mapped.provider_track_id == "999"
     assert mapped.title == "URN Track"
+    assert mapped.access == "preview"
 
 
 def test_add_tracks_sends_id_references_without_urn(monkeypatch):
@@ -154,6 +156,66 @@ def test_resolve_track_url_uses_follow_redirects(monkeypatch):
     mapped = asyncio.run(provider.resolve_track_url("https://soundcloud.com/test/resolved-redirected-track"))
     assert captured["follow_redirects"] is True
     assert mapped.provider_track_id == "321"
+
+
+def test_search_and_related_tracks_request_preview_access_and_preserve_access(monkeypatch):
+    provider = SoundcloudProvider("token")
+    captured_params: list[dict[str, object]] = []
+
+    class _FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str, headers: dict, params: dict):
+            captured_params.append(dict(params))
+            request = httpx.Request("GET", f"https://api.soundcloud.com{url}")
+            if url == "/tracks":
+                return httpx.Response(
+                    200,
+                    request=request,
+                    json=[
+                        {
+                            "id": "123",
+                            "title": "Preview Result",
+                            "access": "preview",
+                            "user": {"username": "Artist"},
+                            "permalink_url": "https://soundcloud.com/test/preview-result",
+                        }
+                    ],
+                )
+            if url == "/tracks/123/related":
+                return httpx.Response(
+                    200,
+                    request=request,
+                    json={
+                        "collection": [
+                            {
+                                "id": "456",
+                                "title": "Related Preview",
+                                "access": "preview",
+                                "user": {"username": "Artist Two"},
+                                "permalink_url": "https://soundcloud.com/test/related-preview",
+                            }
+                        ]
+                    },
+                )
+            raise AssertionError(f"Unexpected request to {url}")
+
+    monkeypatch.setattr(httpx, "AsyncClient", _FakeAsyncClient)
+
+    search_results = asyncio.run(provider.search_tracks("preview", limit=5))
+    related_results = asyncio.run(provider.related_tracks("123", limit=5, offset=0))
+
+    assert search_results[0].access == "preview"
+    assert related_results[0].access == "preview"
+    assert captured_params[0]["access"] == "playable,preview"
+    assert captured_params[1]["access"] == "playable,preview"
 
 
 def test_shuffle_playlist_reorders_tracks_and_preserves_duplicates(monkeypatch):

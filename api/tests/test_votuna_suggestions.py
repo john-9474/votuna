@@ -80,6 +80,17 @@ def test_create_suggestion_personal_mode_conflict(auth_client, db_session, votun
 
 
 def test_search_tracks_for_suggestions(auth_client, votuna_playlist, provider_stub):
+    provider_stub.search_tracks_results = [
+        ProviderTrack(
+            provider_track_id="track-search-preview",
+            title="Preview Search Result",
+            artist="Artist",
+            genre="House",
+            artwork_url=None,
+            url="https://soundcloud.com/test/track-search-preview",
+            access="preview",
+        )
+    ]
     response = auth_client.get(
         f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/search",
         params={"q": "house", "limit": 1},
@@ -87,7 +98,8 @@ def test_search_tracks_for_suggestions(auth_client, votuna_playlist, provider_st
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["provider_track_id"] == "track-search-1"
+    assert data[0]["provider_track_id"] == "track-search-preview"
+    assert data[0]["access"] == "preview"
 
 
 def test_search_tracks_for_suggestions_whitespace_query_returns_400(
@@ -920,6 +932,31 @@ def test_recommendations_limit_artist_concentration(auth_client, votuna_playlist
     data = response.json()
     jme_count = sum(1 for track in data if (track.get("artist") or "").lower() == "jmebbk")
     assert jme_count <= 2
+
+
+def test_recommendations_include_soundcloud_access(auth_client, votuna_playlist, provider_stub):
+    provider_stub.related_tracks_by_seed = {
+        "track-1": [
+            ProviderTrack(
+                provider_track_id="track-related-preview",
+                title="Preview Recommendation",
+                artist="Artist",
+                genre="House",
+                artwork_url=None,
+                url="https://soundcloud.com/test/track-related-preview",
+                access="preview",
+            )
+        ],
+        "track-2": [],
+    }
+    response = auth_client.get(
+        f"/api/v1/votuna/playlists/{votuna_playlist.id}/tracks/recommendations",
+        params={"limit": 5, "refresh_nonce": "preview-access"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data[0]["provider_track_id"] == "track-related-preview"
+    assert data[0]["access"] == "preview"
 
 
 def test_recommendations_provider_auth_owner_returns_401(
