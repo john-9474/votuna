@@ -179,9 +179,7 @@ def test_management_remove_premium_songs_owner_success(auth_client, votuna_playl
         ),
     ]
 
-    response = auth_client.post(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs"
-    )
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs")
 
     assert response.status_code == 200
     data = response.json()
@@ -192,8 +190,7 @@ def test_management_remove_premium_songs_owner_success(auth_client, votuna_playl
     assert data["failed_count"] == 0
     assert data["error"] is None
     remaining_track_ids = [
-        track.provider_track_id
-        for track in provider_stub.tracks_by_playlist_id[votuna_playlist.provider_playlist_id]
+        track.provider_track_id for track in provider_stub.tracks_by_playlist_id[votuna_playlist.provider_playlist_id]
     ]
     assert remaining_track_ids == ["playable-1"]
 
@@ -209,9 +206,7 @@ def test_management_remove_premium_songs_noop_when_no_preview_tracks(auth_client
         )
     ]
 
-    response = auth_client.post(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs"
-    )
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs")
 
     assert response.status_code == 200
     data = response.json()
@@ -221,9 +216,7 @@ def test_management_remove_premium_songs_noop_when_no_preview_tracks(auth_client
 
 
 def test_management_remove_premium_songs_non_owner_forbidden(other_auth_client, votuna_playlist):
-    response = other_auth_client.post(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs"
-    )
+    response = other_auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs")
     assert response.status_code == 403
 
 
@@ -236,9 +229,7 @@ def test_management_remove_premium_songs_non_soundcloud_returns_405(
     db_session.add(votuna_playlist)
     db_session.commit()
 
-    response = auth_client.post(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs"
-    )
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs")
     assert response.status_code == 405
 
 
@@ -262,9 +253,7 @@ def test_management_remove_premium_songs_provider_error_returns_502(
         raise ProviderAPIError("provider unavailable")
 
     monkeypatch.setattr(provider_stub, "remove_tracks", _raise_provider_error)
-    response = auth_client.post(
-        f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs"
-    )
+    response = auth_client.post(f"/api/v1/votuna/playlists/{votuna_playlist.id}/management/remove-premium-songs")
     assert response.status_code == 502
 
 
