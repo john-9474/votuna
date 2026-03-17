@@ -141,8 +141,8 @@ export default function ReviewRunPanel({
                             <span
                               className={
                                 isDuplicate
-                                  ? 'inline-flex h-8 w-full max-w-[6.75rem] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-[color:rgb(var(--votuna-ink)/0.24)] px-2 text-xs font-semibold leading-none text-[color:rgb(var(--votuna-ink)/0.82)]'
-                                  : 'inline-flex h-8 w-full max-w-[6.75rem] items-center justify-center overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-emerald-500/60 px-2 text-xs font-semibold leading-none text-emerald-600 dark:text-emerald-400'
+                                  ? 'flex h-8 w-full max-w-[7.5rem] items-center justify-center whitespace-nowrap rounded-md border border-[color:rgb(var(--votuna-ink)/0.24)] px-3 text-xs font-semibold leading-tight text-[color:rgb(var(--votuna-ink)/0.82)]'
+                                  : 'flex h-8 w-full max-w-[7.5rem] items-center justify-center whitespace-nowrap rounded-md border border-emerald-500/60 px-3 text-xs font-semibold leading-tight text-emerald-600 dark:text-emerald-400'
                               }
                             >
                               {isDuplicate ? 'Duplicate' : 'Will copy'}
